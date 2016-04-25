@@ -17,7 +17,7 @@ go get -u github.com/nobonobo/rccargo
 
 ## Linux
 
-- ode install (./configure --with-shared --with-double-precision)
+- ode install (./configure --with-shared --with-double-precision --with-libccd)
 
 ```sh
 go get -u github.com/ianremmler/ode
@@ -47,3 +47,32 @@ document:
 - ghost of fastest-lap.
 - physics-sim-server
 - webgl-renderer+player-input
+
+# coordinate system
+
+GL: right-hand
+
+X: left(+)-right(-)
+Y: up(+)-down(-)
+Z: front(+)-back(-)
+
+direction: (1=x, 2=y, 3=z)
+
+# world params
+
+world parameters:
+    ERP = 0.8
+    CFM = 1.0e-5
+    step size = 1/100
+    gravity = Y(-) 9.8m/s2
+
+# compositions
+    
+- World 運動空間
+    - Body 質点
+        - Mass 質量（モーメント形状付き）
+        - Data 任意のデータ
+
+- Space 衝突空間
+    - Geom 形状
+        - Data 任意のデータ
