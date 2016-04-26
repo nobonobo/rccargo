@@ -1,9 +1,5 @@
 package models
 
-/*
-#include <stdint.h>
-*/
-import "C"
 import "github.com/ianremmler/ode"
 
 func init() {
