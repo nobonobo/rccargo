@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ianremmler/ode"
+	"github.com/nobonobo/rccargo/protocol"
 )
 
 func callback(data interface{}, obj1, obj2 ode.Geom) {
@@ -28,7 +29,7 @@ func TestVehicle(t *testing.T) {
 	ctx := NewContext()
 	ctx.World.SetGravity(ode.V3(0, 0, -0.5))
 
-	profile := Profile{
+	profile := protocol.Profile{
 		BodyDensity:  0.2,
 		BodyBox:      ode.V3(0.200, 0.100, 0.350),
 		BodyZOffset:  0.0,
