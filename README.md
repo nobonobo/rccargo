@@ -66,8 +66,11 @@ world parameters:
     step size = 1/100
     gravity = Y(-) 9.8m/s2
 
-# compositions
-    
+Course Setup
+
+
+# ode compositions
+
 - World 運動空間
     - Body 質点
         - Mass 質量（モーメント形状付き）
@@ -76,3 +79,12 @@ world parameters:
 - Space 衝突空間
     - Geom 形状
         - Data 任意のデータ
+
+# join sequence
+
+1. open brouwser assets/index.html
+2. ws connect to host/ws
+3. new vehicle add to world
+4. jsonrpc call "World.Update"
+5. World render by WebGL
+6. repeat to 4.

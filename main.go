@@ -66,9 +66,12 @@ func (w *World) Update(req *Input, rep *Output) error {
 }
 
 // RPCServer ...
-func RPCServer(ws *websocket.Conn) {
-	fmt.Println("connect:", ws.RemoteAddr)
-	defer fmt.Println("disconnect:", ws.RemoteAddr)
+func (w *World) handle(ws *websocket.Conn) {
+	name := ws.RemoteAddr().String()
+	fmt.Println("connect:", name)
+	defer fmt.Println("disconnect:", name)
+	w.vehicles[name] = models.NewVehicle(w.ctx, profile)
+	defer delete(w.vehicles, name)
 	jsonrpc.ServeConn(ws)
 }
 
@@ -95,10 +98,9 @@ func main() {
 	ctx.World.SetGravity(ode.V3(0, 0, -0.5))
 
 	world := &World{ctx: ctx, vehicles: map[string]*models.Vehicle{}}
-	world.vehicles["player"] = models.NewVehicle(ctx, profile)
 
 	rpc.Register(world)
-	http.Handle("/ws", websocket.Handler(RPCServer))
+	http.Handle("/ws", websocket.Handler(world.handle))
 	http.Handle("/", http.FileServer(http.Dir("assets")))
 	log.Println("listen:", addr)
 	if err := http.Serve(l, nil); err != nil {
