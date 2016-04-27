@@ -6,9 +6,8 @@ import (
 	"github.com/ianremmler/ode"
 )
 
-var ctx *Context
-
 func callback(data interface{}, obj1, obj2 ode.Geom) {
+	ctx := data.(*Context)
 	contact := ode.NewContact()
 	body1, body2 := obj1.Body(), obj2.Body()
 	if body1 != 0 && body2 != 0 && body1.Connected(body2) {
@@ -26,10 +25,12 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 }
 
 func TestVehicle(t *testing.T) {
-	ctx = NewContext(callback)
+	ctx := NewContext()
+	ctx.World.SetGravity(ode.V3(0, 0, -0.5))
+
 	profile := Profile{
 		BodyDensity:  0.2,
-		BodyBox:      ode.Vector3{0.200, 0.100, 0.350},
+		BodyBox:      ode.V3(0.200, 0.100, 0.350),
 		BodyZOffset:  0.0,
 		Wheelbase:    0.267,
 		Tread:        0.160,
@@ -40,6 +41,6 @@ func TestVehicle(t *testing.T) {
 	v := NewVehicle(ctx, profile)
 	t.Log(v)
 	for i := 0; i < 1000; i++ {
-		ctx.Iter()
+		ctx.Iter(callback)
 	}
 }
