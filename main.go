@@ -67,6 +67,8 @@ func (w *World) Update(req *Input, rep *Output) error {
 
 // RPCServer ...
 func RPCServer(ws *websocket.Conn) {
+	fmt.Println("connect:", ws.RemoteAddr)
+	defer fmt.Println("disconnect:", ws.RemoteAddr)
 	jsonrpc.ServeConn(ws)
 }
 
@@ -97,8 +99,9 @@ func main() {
 
 	rpc.Register(world)
 	http.Handle("/ws", websocket.Handler(RPCServer))
+	http.Handle("/", http.FileServer(http.Dir("assets")))
 	log.Println("listen:", addr)
-	if err := http.Serve(l, http.FileServer(http.Dir("assets"))); err != nil {
+	if err := http.Serve(l, nil); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
