@@ -35,6 +35,6 @@ type Vehicle struct {
 
 // Output ...
 type Output struct {
-	Self   Vehicle
-	Others []Vehicle
+	Self   *Vehicle
+	Others []*Vehicle
 }

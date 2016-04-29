@@ -22,7 +22,7 @@ var profile = protocol.Profile{
 	BodyBox:      ode.V3(0.200, 0.050, 0.380),
 	BodyZOffset:  0.0,
 	Wheelbase:    0.267,
-	Tread:        0.160 + 0.1,
+	Tread:        0.160,
 	TireDensity:  0.03,
 	TireDiameter: 0.088,
 	TireWidth:    0.033,
@@ -40,21 +40,18 @@ func (w *World) Join(name string, rep *protocol.Profile) error {
 	if w.vehicles[name] != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.ctx.Lock()
-	w.vehicles[name] = models.NewVehicle(w.ctx, profile)
-	w.ctx.Unlock()
+	w.vehicles[name] = w.ctx.AddVehicle(profile)
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
 	*rep = profile
+	log.Println("join:", name)
 	return nil
 }
 
 func (w *World) gc(name string) {
 	if v := w.vehicles[name]; v != nil {
-		w.ctx.Lock()
-		v.Destroy()
-		w.ctx.Unlock()
+		w.ctx.RmVehicle(v)
 	}
 	if tm := w.timers[name]; tm != nil {
 		tm.Stop()
@@ -66,6 +63,7 @@ func (w *World) gc(name string) {
 // Bye ...
 func (w *World) Bye(name string, rep *string) error {
 	w.gc(name)
+	log.Println("bye:", name)
 	return nil
 }
 
@@ -78,28 +76,19 @@ func (w *World) Update(req *protocol.Input, rep *protocol.Output) error {
 			ws[i].Position = wheel.Position()
 			ws[i].Quaternion = wheel.Quaternion()
 		}
-		pv := protocol.Vehicle{
+		pv := &protocol.Vehicle{
 			Name:  name,
 			Body:  protocol.Attitude{Position: v.Position(), Quaternion: v.Quaternion()},
 			Tires: ws,
 		}
 		if req.Name == name {
 			(*rep).Self = pv
-			for i := 0; i < 4; i++ {
-				wheel := v.Wheel(i)
-				d := req.Steering - wheel.Joint.Angle1()
-				if d > 0.1 {
-					d = 0.1
-				}
-				if d < -0.1 {
-					d = -0.1
-				}
-				wheel.Joint.SetParam(ode.VelJtParam, d*10.0)
-				wheel.Joint.SetParam(ode.VelJtParam2, -req.Accel)
-			}
-			continue
+			w.ctx.Lock()
+			v.Update(req)
+			w.ctx.Unlock()
+		} else {
+			(*rep).Others = append((*rep).Others, pv)
 		}
-		(*rep).Others = append((*rep).Others, pv)
 	}
 	if t := w.timers[req.Name]; t != nil {
 		t.Reset(5 * time.Second)
@@ -108,8 +97,8 @@ func (w *World) Update(req *protocol.Input, rep *protocol.Output) error {
 }
 
 func (w *World) handle(ws *websocket.Conn) {
-	fmt.Println("connect:", ws.Request().RemoteAddr)
-	defer fmt.Println("disconnect:", ws.Request().RemoteAddr)
+	log.Println("connect:", ws.Request().RemoteAddr)
+	defer log.Println("disconnect:", ws.Request().RemoteAddr)
 	jsonrpc.ServeConn(ws)
 }
 
@@ -120,15 +109,13 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 		return
 	}
 	cts := obj1.Collide(obj2, 1, 0)
-	if len(cts) > 0 {
-		if obj1.IsSpace() || obj2.IsSpace() {
-			log.Fatalln("space!")
-		}
+	for _, c := range cts {
 		contact := ode.NewContact()
-		contact.Surface.Mode = 0
-		contact.Surface.Mu = 0.1
-		contact.Surface.Mu2 = 0
-		contact.Geom = cts[0]
+		contact.Surface.Mode = ode.SoftERPCtParam | ode.SoftCFMCtParam
+		contact.Surface.Mu = 1.0
+		contact.Surface.SoftCfm = 10e-3
+		contact.Surface.SoftErp = 0.3
+		contact.Geom = c
 		ct := ctx.World.NewContactJoint(ctx.JointGroup, contact)
 		ct.Attach(body1, body2)
 	}
@@ -144,9 +131,9 @@ func main() {
 
 	ctx := models.NewContext()
 	ctx.World.SetGravity(ode.V3(0, -9.80665, 0))
-	//ctx.World.SetCFM(10e-5)
-	//ctx.World.SetERP(0.9)
-	ctx.World.SetAutoDisable(false)
+	ctx.World.SetCFM(10e-5)
+	ctx.World.SetERP(0.9)
+	//ctx.World.SetAutoDisable(false)
 
 	world := &World{
 		ctx:      ctx,

@@ -12,12 +12,36 @@ import (
 )
 
 var (
-	document = js.Global.Get("document")
-	window   = js.Global.Get("window")
-	THREE    = js.Global.Get("THREE")
+	document  = js.Global.Get("document")
+	navigator = js.Global.Get("navigator")
+	window    = js.Global.Get("window")
+	THREE     = js.Global.Get("THREE")
 )
 
-func start(c *rpc.Client) {
+// Start ...
+func Start(c *rpc.Client) {
+	axes := []func() float64{
+		func() float64 { return 0.0 },
+		func() float64 { return 0.0 },
+		func() float64 { return 0.0 },
+	}
+	if f := navigator.Get("getGamepads"); f != js.Undefined {
+		joystick := navigator.Call("getGamepads").Index(0)
+		if joystick != js.Undefined {
+			get := func() *js.Object {
+				return navigator.Call("getGamepads").Index(0)
+			}
+			axes[0] = func() float64 {
+				return (get().Get("axes").Index(0).Float()*2 - 1) * -1
+			}
+			axes[1] = func() float64 {
+				return get().Get("axes").Index(2).Float()
+			}
+			axes[2] = func() float64 {
+				return get().Get("buttons").Index(0).Get("value").Float()
+			}
+		}
+	}
 	w, h := js.Global.Get("innerWidth").Float(), js.Global.Get("innerHeight").Float()
 	//w, h := 640.0, 480.0
 	renderer := THREE.Get("WebGLRenderer").New(map[string]interface{}{})
@@ -29,7 +53,7 @@ func start(c *rpc.Client) {
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
 	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
-	camera.Get("position").Call("set", 0.0, -0.4, -1.0)
+	camera.Get("position").Call("set", 0.1, -0.4, -1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0xffffff))
 
@@ -56,19 +80,26 @@ func start(c *rpc.Client) {
 	document.Get("body").Call("appendChild", stats.Get("dom"))
 
 	profile := protocol.Profile{}
-	name := "player"
-	if err := c.Call("World.Join", name, &profile); err != nil {
-		fmt.Println("rpc failed:", err)
+	name := ""
+	for i := 1; i <= 20; i++ {
+		name = fmt.Sprintf("player%d", i)
+		if err := c.Call("World.Join", name, &profile); err != nil {
+			fmt.Println("rpc failed:", err)
+			continue
+		} else {
+			break
+		}
+	}
+	if name == "" {
+		fmt.Println("join failed")
 		return
 	}
 	window.Call("addEventListener", "unload", func() {
 		res := ""
-		if err := c.Call("World.Bye", name, &res); err != nil {
-			fmt.Println("rpc failed:", err)
-		}
+		c.Go("World.Bye", name, &res, nil)
 	}, false)
 	fmt.Println("profile:", profile)
-	func() {
+	build := func(name string) {
 		geometry := THREE.Get("BoxGeometry").New(
 			profile.BodyBox[0],
 			profile.BodyBox[1],
@@ -85,6 +116,7 @@ func start(c *rpc.Client) {
 				profile.TireDiameter/2, profile.TireDiameter/2,
 				profile.TireWidth, 32,
 			)
+			geometry.Call("rotateX", math.Pi/2)
 			if i%2 == 0 {
 				geometry.Call("rotateZ", math.Pi/2)
 			} else {
@@ -97,37 +129,145 @@ func start(c *rpc.Client) {
 			tire.Set("name", fmt.Sprintf("%s-tire%d", name, i))
 			scene.Call("add", tire)
 		}
+	}
+	//build(name)
+	steering := axes[0]()
+	accel, brake := axes[1](), axes[2]()
+	sx, sy := 0.0, 0.0
+	mouse := false
+	element.Call("addEventListener", "mousedown", func(ev *js.Object) {
+		sx = ev.Get("clientX").Float()
+		sy = ev.Get("clientY").Float()
+	}, false)
+	element.Call("addEventListener", "mousemove", func(ev *js.Object) {
+		which := ev.Get("which").Int()
+		if which == 1 {
+			mouse = true
+			dx := (ev.Get("clientX").Float() - sx) / 200.0
+			dy := (ev.Get("clientY").Float() - sy) / 200.0
+			if dx < -1 {
+				dx = -1
+			}
+			if dx > 1 {
+				dx = 1
+			}
+			if dy < -1 {
+				dy = -1
+			}
+			if dy > 1 {
+				dy = 1
+			}
+			steering = dx
+			if dy < 0.0 {
+				accel = -dy
+				brake = 0.0
+			} else {
+				accel = 0.0
+				brake = dy
+			}
+		} else {
+			mouse = false
+			steering = axes[0]()
+			accel, brake = axes[1](), axes[2]()
+		}
+	}, false)
+	element.Call("addEventListener", "mouseup", func(ev *js.Object) {
+		mouse = false
+		steering = axes[0]()
+		accel, brake = axes[1](), axes[2]()
+	}, false)
+	element.Call("addEventListener", "mouseout", func(ev *js.Object) {
+		mouse = false
+		steering = axes[0]()
+		accel, brake = axes[1](), axes[2]()
+	}, false)
+
+	update := func() error {
+		if !mouse {
+			steering = axes[0]()
+			accel, brake = axes[1](), axes[2]()
+		}
+		in := protocol.Input{
+			Name:     name,
+			Steering: steering,
+			Accel:    accel,
+			Brake:    brake,
+		}
+		res := &protocol.Output{}
+		if err := c.Call("World.Update", in, &res); err != nil {
+			return err
+		}
+		move := func(v *protocol.Vehicle) {
+			for i, w := range v.Tires {
+				tire := scene.Call("getObjectByName", fmt.Sprintf("%s-tire%d", v.Name, i))
+				tire.Get("position").Call("set",
+					w.Position[0],
+					w.Position[1],
+					w.Position[2],
+				)
+				tire.Get("quaternion").Call("set",
+					w.Quaternion[1],
+					w.Quaternion[2],
+					w.Quaternion[3],
+					w.Quaternion[0],
+				)
+			}
+			body := scene.Call("getObjectByName", v.Name)
+			body.Get("position").Call("set",
+				v.Body.Position[0],
+				v.Body.Position[1],
+				v.Body.Position[2],
+			)
+			body.Get("quaternion").Call("set",
+				v.Body.Quaternion[1],
+				v.Body.Quaternion[2],
+				v.Body.Quaternion[3],
+				v.Body.Quaternion[0],
+			)
+		}
+		for _, vehicle := range append(res.Others, res.Self) {
+			if vehicle == nil {
+				continue
+			}
+			body := scene.Call("getObjectByName", vehicle.Name)
+			if body == js.Undefined {
+				build(vehicle.Name)
+			}
+			move(vehicle)
+		}
+		if res.Self != nil {
+			pos := res.Self.Body.Position
+			camera.Call("lookAt", THREE.Get("Vector3").New(pos[0], pos[1], pos[2]))
+		}
+		return nil
+	}
+
+	ch := make(chan struct{})
+	go func() {
+		defer fmt.Println("update goroutine exit")
+		errorCnt := 0
+		for {
+			if _, ok := <-ch; !ok {
+				return
+			}
+			if err := update(); err != nil {
+				errorCnt++
+				if errorCnt >= 10 {
+					return
+				}
+			} else {
+				errorCnt = 0
+			}
+		}
 	}()
 
 	var render func()
 	render = func() {
 		stats.Call("begin")
-		go func() {
-			res := &protocol.Output{}
-			if err := c.Call("World.Update", protocol.Input{Name: "player"}, &res); err != nil {
-				fmt.Println("rpc failed:", err)
-				return
-			}
-			for i, w := range res.Self.Tires {
-				tire := scene.Call("getObjectByName", fmt.Sprintf("%s-tire%d", res.Self.Name, i))
-				tire.Get("position").Call("set", w.Position[0], w.Position[1], w.Position[2])
-				tire.Get("quaternion").Call("set", w.Quaternion[0], w.Quaternion[1], w.Quaternion[2], w.Quaternion[3])
-			}
-			body := scene.Call("getObjectByName", res.Self.Name)
-			body.Get("position").Call("set",
-				res.Self.Body.Position[0],
-				res.Self.Body.Position[1],
-				res.Self.Body.Position[2],
-			)
-			body.Get("quaternion").Call("set",
-				res.Self.Body.Quaternion[0],
-				res.Self.Body.Quaternion[1],
-				res.Self.Body.Quaternion[2],
-				res.Self.Body.Quaternion[3],
-			)
-			pos := res.Self.Body.Position
-			camera.Call("lookAt", THREE.Get("Vector3").New(pos[0], pos[1], pos[2]))
-		}()
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
 		renderer.Call("render", scene, camera)
 		stats.Call("end")
 		js.Global.Call("requestAnimationFrame", render)
@@ -140,5 +280,5 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	start(jsonrpc.NewClient(c))
+	Start(jsonrpc.NewClient(c))
 }
