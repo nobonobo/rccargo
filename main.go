@@ -48,7 +48,7 @@ func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 	if w.vehicles[name] != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.vehicles[name] = w.ctx.AddVehicle(profile.Vehicle)
+	w.vehicles[name] = w.ctx.AddVehicle()
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
@@ -144,7 +144,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := models.NewContext()
+	ctx := models.NewContext(profile)
 	ctx.World.SetGravity(ode.V3(profile.World.Gravity...))
 	ctx.World.SetCFM(profile.World.CFM)
 	ctx.World.SetERP(profile.World.ERP)

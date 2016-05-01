@@ -18,14 +18,16 @@ type Context struct {
 	ode.World
 	ode.Space
 	JointGroup ode.JointGroup
+	Profile    protocol.Profile
 }
 
 // NewContext ...
-func NewContext() *Context {
+func NewContext(profile protocol.Profile) *Context {
 	return &Context{
 		World:      ode.NewWorld(),
 		Space:      ode.NilSpace().NewHashSpace(),
 		JointGroup: ode.NewJointGroup(10000),
+		Profile:    profile,
 	}
 }
 
@@ -39,10 +41,10 @@ func (ctx *Context) Iter(step time.Duration, callback ode.NearCallback) {
 }
 
 // AddVehicle ...
-func (ctx *Context) AddVehicle(profile protocol.VehicleProfile) *Vehicle {
+func (ctx *Context) AddVehicle() *Vehicle {
 	ctx.Lock()
 	defer ctx.Unlock()
-	return NewVehicle(ctx, profile)
+	return NewVehicle(ctx, ctx.Profile.Vehicle)
 }
 
 // RmVehicle ...
