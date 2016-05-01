@@ -1,0 +1,17 @@
+{
+    "World": {
+        "Gravity": [0, -9.80665, 0],
+        "CFM": 10e-5,
+        "ERP": 0.8
+    },
+    "Vehicle": {
+		"BodyDensity":  0.05,
+		"BodyBox":      [0.200, 0.050, 0.380],
+		"BodyZOffset":  0.0,
+		"Wheelbase":    0.267,
+		"Tread":        0.160,
+		"TireDensity":  0.03,
+		"TireDiameter": 0.088,
+		"TireWidth":    0.033
+    }
+}
