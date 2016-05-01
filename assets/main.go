@@ -32,10 +32,10 @@ func Start(c *rpc.Client) {
 				return navigator.Call("getGamepads").Index(0)
 			}
 			axes[0] = func() float64 {
-				return (get().Get("axes").Index(0).Float()*2 - 1) * -1
+				return get().Get("axes").Index(0).Float()
 			}
 			axes[1] = func() float64 {
-				return get().Get("axes").Index(2).Float()
+				return get().Get("axes").Index(3).Float() * -1
 			}
 			axes[2] = func() float64 {
 				return get().Get("buttons").Index(0).Get("value").Float()
@@ -79,7 +79,7 @@ func Start(c *rpc.Client) {
 	stats.Call("showPanel", 0) // 0: fps, 1: ms, 2: mb, 3+: custom
 	document.Get("body").Call("appendChild", stats.Get("dom"))
 
-	profile := protocol.Profile{}
+	profile := protocol.VehicleProfile{}
 	name := ""
 	for i := 1; i <= 20; i++ {
 		name = fmt.Sprintf("player%d", i)

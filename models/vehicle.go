@@ -59,7 +59,7 @@ type Vehicle struct {
 }
 
 // NewVehicle ...
-func NewVehicle(ctx *Context, profile protocol.Profile) *Vehicle {
+func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 	body := ctx.World.NewBody()
 	geom := ctx.Space.NewBox(profile.BodyBox)
 	geom.SetBody(body)

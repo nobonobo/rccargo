@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -18,14 +19,21 @@ import (
 )
 
 var profile = protocol.Profile{
-	BodyDensity:  0.05,
-	BodyBox:      ode.V3(0.200, 0.050, 0.380),
-	BodyZOffset:  0.0,
-	Wheelbase:    0.267,
-	Tread:        0.160,
-	TireDensity:  0.03,
-	TireDiameter: 0.088,
-	TireWidth:    0.033,
+	World: protocol.WorldProfile{
+		Gravity: []float64{0, -9.80665, 0},
+		CFM:     10e-5,
+		ERP:     0.8,
+	},
+	Vehicle: protocol.VehicleProfile{
+		BodyDensity:  0.05,
+		BodyBox:      []float64{0.200, 0.050, 0.380},
+		BodyZOffset:  0.0,
+		Wheelbase:    0.267,
+		Tread:        0.160,
+		TireDensity:  0.03,
+		TireDiameter: 0.088,
+		TireWidth:    0.033,
+	},
 }
 
 // World ...
@@ -36,15 +44,15 @@ type World struct {
 }
 
 // Join ...
-func (w *World) Join(name string, rep *protocol.Profile) error {
+func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 	if w.vehicles[name] != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.vehicles[name] = w.ctx.AddVehicle(profile)
+	w.vehicles[name] = w.ctx.AddVehicle(profile.Vehicle)
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
-	*rep = profile
+	*rep = profile.Vehicle
 	log.Println("join:", name)
 	return nil
 }
@@ -122,6 +130,13 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 }
 
 func main() {
+	fp, err := os.Open("./profile.json")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err := json.NewDecoder(fp).Decode(&profile); err != nil {
+		log.Fatalln(err)
+	}
 	addr := "0.0.0.0:8080"
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -130,9 +145,9 @@ func main() {
 	}
 
 	ctx := models.NewContext()
-	ctx.World.SetGravity(ode.V3(0, -9.80665, 0))
-	ctx.World.SetCFM(10e-5)
-	ctx.World.SetERP(0.9)
+	ctx.World.SetGravity(ode.V3(profile.World.Gravity...))
+	ctx.World.SetCFM(profile.World.CFM)
+	ctx.World.SetERP(profile.World.ERP)
 	//ctx.World.SetAutoDisable(false)
 
 	world := &World{

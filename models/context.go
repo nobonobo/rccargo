@@ -39,7 +39,7 @@ func (ctx *Context) Iter(step time.Duration, callback ode.NearCallback) {
 }
 
 // AddVehicle ...
-func (ctx *Context) AddVehicle(profile protocol.Profile) *Vehicle {
+func (ctx *Context) AddVehicle(profile protocol.VehicleProfile) *Vehicle {
 	ctx.Lock()
 	defer ctx.Unlock()
 	return NewVehicle(ctx, profile)

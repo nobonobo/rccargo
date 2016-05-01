@@ -1,7 +1,16 @@
 package protocol
 
-// Profile ...
-type Profile struct {
+// WorldProfile ...
+type WorldProfile struct {
+	Gravity                []float64
+	CFM                    float64
+	ERP                    float64
+	QuickStepW             float64
+	QuickStepNumIteretions int
+}
+
+// VehicleProfile ...
+type VehicleProfile struct {
 	BodyDensity  float64   // default 0.2
 	BodyBox      []float64 // { width, height, length }
 	BodyZOffset  float64   // Offset Adjust from center of wheels
@@ -10,6 +19,12 @@ type Profile struct {
 	TireDensity  float64   // default 0.1
 	TireDiameter float64   // default 0.088m
 	TireWidth    float64   // default 0.033m
+}
+
+// Profile ...
+type Profile struct {
+	World   WorldProfile
+	Vehicle VehicleProfile
 }
 
 // Input ...
