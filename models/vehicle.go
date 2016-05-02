@@ -5,6 +5,8 @@ package models
 */
 import "C"
 import (
+	"math"
+
 	"github.com/ianremmler/ode"
 	"github.com/nobonobo/rccargo/protocol"
 )
@@ -90,12 +92,15 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		w.Joint.Attach(v.body, w.body)
 		w.Joint.SetAxis1(ode.V3(0, 1, 0))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
-		w.Joint.SetParam(ode.FudgeFactorJtParam, 0.1)
-		w.Joint.SetParam(ode.FMaxJtParam, 0.5)  // 操舵トルク最大値Nm
-		w.Joint.SetParam(ode.FMaxJtParam2, 0.1) // 動輪トルク最大値Nm
-		step, spring, damping := 0.05, 3.0, 0.85
-		w.Joint.SetParam(ode.SuspensionCFMJtParam, step*spring/(step*spring+damping))
-		w.Joint.SetParam(ode.SuspensionERPJtParam, 1.0/(step*spring+damping))
+		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
+		w.Joint.SetParam(ode.FMaxJtParam, 0.01) // 操舵トルク最大値Nm
+		//w.Joint.SetParam(ode.LoStopJtParam, -1.0) // 操舵最小角
+		//w.Joint.SetParam(ode.HiStopJtParam, 1.0)  // 操舵最大角
+
+		k := profile.SuspensionStep * profile.SuspensionSpring
+		base := k + profile.SuspensionDamping
+		w.Joint.SetParam(ode.SuspensionCFMJtParam, k/base)
+		w.Joint.SetParam(ode.SuspensionERPJtParam, 1.0/base)
 		w.body.SetPosition(ode.V3(x, y, z))
 		w.Joint.SetAnchor(w.Position())
 	}
@@ -133,14 +138,25 @@ func (v *Vehicle) Update(in *protocol.Input) {
 		if i < 2 {
 			angle = in.Steering
 		}
-		d := angle - wheel.Joint.Angle1()
-		if d > 1.0 {
-			d = 1.0
+		d := (angle / 2) - wheel.Joint.Angle1()
+		if d > 2*math.Pi {
+			d = 2 * math.Pi
 		}
-		if d < -1.0 {
-			d = -1.0
+		if d < -2*math.Pi {
+			d = -2 * math.Pi
 		}
-		wheel.Joint.SetParam(ode.VelJtParam, d)
-		wheel.Joint.SetParam(ode.VelJtParam2, (in.Brake-in.Accel)*50.0)
+		wheel.Joint.SetParam(ode.VelJtParam, d*10)
+		if in.Brake > 0.5 {
+			brake := (in.Brake-0.5)*2 - in.Accel
+			// 動輪目標速度rad/s
+			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
+			// 動輪トルク最大値Nm
+			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*8*10e-6)
+		} else {
+			// 動輪目標速度rad/s
+			wheel.Joint.SetParam(ode.VelJtParam2, -160.0)
+			// 動輪トルク最大値Nm
+			wheel.Joint.SetParam(ode.FMaxJtParam2, in.Accel*8*10e-6)
+		}
 	}
 }

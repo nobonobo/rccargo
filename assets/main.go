@@ -47,15 +47,29 @@ func Start(c *rpc.Client) {
 	renderer := THREE.Get("WebGLRenderer").New(map[string]interface{}{})
 	renderer.Call("setSize", w, h)
 	renderer.Call("setClearColor", 0x000000, 1)
+	renderer.Get("shadowMap").Set("enabled", true)
+	renderer.Get("shadowMap").Set("type", THREE.Get("PCFSoftShadowMap"))
+
 	scene := THREE.Get("Scene").New()
 
 	//cameraPan := 0.0
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
 	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
-	camera.Get("position").Call("set", 0.1, -0.4, -1.0)
+	camera.Get("position").Call("set", 0.1, 0.0, -1.0)
 	scene.Call("add", camera)
-	scene.Call("add", THREE.Get("AmbientLight").New(0xffffff))
+	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
+	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
+	sunlight.Get("position").Call("set", 100, 100, 100)
+	sunlight.Set("castShadow", true)
+	/*
+		sunlight.Set("shadow", THREE.Get("LightShadow").New(
+			THREE.Get("PerspectiveCamera").New(50, 1, 1200, 2500)))
+		sunlight.Get("shadow").Set("bias", 0.0001)
+		sunlight.Get("shadow").Get("mapSize").Set("width", 256)
+		sunlight.Get("shadow").Get("mapSize").Set("height", 256)
+	*/
+	scene.Call("add", sunlight)
 
 	window.Call("addEventListener", "resize", func() {
 		w, h := js.Global.Get("innerWidth").Float(), js.Global.Get("innerHeight").Float()
@@ -66,11 +80,15 @@ func Start(c *rpc.Client) {
 
 	geometry := THREE.Get("PlaneGeometry").New(20, 20, 32, 32)
 	geometry.Call("rotateX", -math.Pi/2)
-	material := THREE.Get("MeshBasicMaterial").New(
-		map[string]interface{}{"color": 0x404040, "wireframe": true},
+	material := THREE.Get("MeshLambertMaterial").New(
+		map[string]interface{}{
+			"color": 0x404040,
+			//"wireframe": true,
+		},
 	)
 	plane := THREE.Get("Mesh").New(geometry, material)
 	plane.Get("position").Set("y", -0.5)
+	plane.Set("receiveShadow", true)
 	scene.Call("add", plane)
 
 	element := renderer.Get("domElement")
@@ -101,15 +119,16 @@ func Start(c *rpc.Client) {
 	fmt.Println("profile:", profile)
 	build := func(name string) {
 		geometry := THREE.Get("BoxGeometry").New(
-			profile.BodyBox[0],
+			profile.BodyBox[0]/2,
 			profile.BodyBox[1],
 			profile.BodyBox[2],
 		)
-		material := THREE.Get("MeshBasicMaterial").New(
+		material := THREE.Get("MeshLambertMaterial").New(
 			map[string]interface{}{"color": 0xffffff},
 		)
 		body := THREE.Get("Mesh").New(geometry, material)
 		body.Set("name", name)
+		body.Set("castShadow", true)
 		scene.Call("add", body)
 		for i := 0; i < 4; i++ {
 			geometry := THREE.Get("CylinderGeometry").New(
@@ -122,11 +141,12 @@ func Start(c *rpc.Client) {
 			} else {
 				geometry.Call("rotateZ", -math.Pi/2)
 			}
-			material := THREE.Get("MeshBasicMaterial").New(
+			material := THREE.Get("MeshLambertMaterial").New(
 				map[string]interface{}{"color": 0x8080ff, "wireframe": true},
 			)
 			tire := THREE.Get("Mesh").New(geometry, material)
 			tire.Set("name", fmt.Sprintf("%s-tire%d", name, i))
+			tire.Set("castShadow", true)
 			scene.Call("add", tire)
 		}
 	}

@@ -20,19 +20,28 @@ import (
 
 var profile = protocol.Profile{
 	World: protocol.WorldProfile{
-		Gravity: []float64{0, -9.80665, 0},
-		CFM:     10e-5,
-		ERP:     0.8,
+		Gravity:                []float64{0, -9.80665, 0},
+		CFM:                    10e-5,
+		ERP:                    0.8,
+		QuickStepW:             1e-3,
+		QuickStepNumIterations: 10,
+		Mu:      1e-6,
+		SoftCfm: 1e-6,
+		SoftErp: 0.3,
 	},
 	Vehicle: protocol.VehicleProfile{
-		BodyDensity:  0.05,
-		BodyBox:      []float64{0.200, 0.050, 0.380},
-		BodyZOffset:  0.0,
-		Wheelbase:    0.267,
-		Tread:        0.160,
-		TireDensity:  0.03,
-		TireDiameter: 0.088,
-		TireWidth:    0.033,
+		BodyDensity:        0.05,
+		BodyBox:            []float64{0.200, 0.050, 0.380},
+		BodyZOffset:        0.0,
+		Wheelbase:          0.267,
+		Tread:              0.160,
+		TireDensity:        0.03,
+		TireDiameter:       0.088,
+		TireWidth:          0.033,
+		FudgeFactorJtParam: 0.01,
+		SuspensionStep:     1.0,
+		SuspensionSpring:   100,
+		SuspensionDamping:  0.1,
 	},
 }
 
@@ -116,13 +125,13 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 	if body1 != 0 && body2 != 0 && body1.Connected(body2) {
 		return
 	}
-	cts := obj1.Collide(obj2, 1, 0)
+	cts := obj1.Collide(obj2, 4, 0)
 	for _, c := range cts {
 		contact := ode.NewContact()
 		contact.Surface.Mode = ode.SoftERPCtParam | ode.SoftCFMCtParam
-		contact.Surface.Mu = 1.0
-		contact.Surface.SoftCfm = 10e-3
-		contact.Surface.SoftErp = 0.3
+		contact.Surface.Mu = profile.World.Mu
+		contact.Surface.SoftCfm = profile.World.SoftCfm
+		contact.Surface.SoftErp = profile.World.SoftErp
 		contact.Geom = c
 		ct := ctx.World.NewContactJoint(ctx.JointGroup, contact)
 		ct.Attach(body1, body2)
@@ -148,6 +157,8 @@ func main() {
 	ctx.World.SetGravity(ode.V3(profile.World.Gravity...))
 	ctx.World.SetCFM(profile.World.CFM)
 	ctx.World.SetERP(profile.World.ERP)
+	ctx.World.SetQuickStepW(profile.World.QuickStepW)
+	ctx.World.SetQuickStepNumIterations(profile.World.QuickStepNumIterations)
 	//ctx.World.SetAutoDisable(false)
 
 	world := &World{
