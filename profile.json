@@ -1,11 +1,11 @@
 {
     "World": {
         "Gravity": [0, -9.80665, 0],
-        "CFM": 10e-5,
-        "ERP": 0.8,
-        "Mu": 0.5e-3,
-        "SoftCfm": 1e-6,
-        "SoftErp": 0.5
+        "CFM": 1e-4,
+        "ERP": 0.9,
+        "Mu": 1.0e+12,
+        "SoftCfm": 1e-2,
+        "SoftErp": 0.99
     },
     "Vehicle": {
 		"BodyDensity":  0.05,
@@ -16,9 +16,9 @@
 		"TireDensity":  0.03,
 		"TireDiameter": 0.088,
 		"TireWidth":    0.033,
-		"FudgeFactorJtParam": 0.01,
-		"SuspensionStep":     1.0,
-		"SuspensionSpring":   1.0,
-		"SuspensionDamping":  0.5
+		"FudgeFactorJtParam": 0.1,
+		"SuspensionStep":     0.01,
+		"SuspensionSpring":   1.0e-1,
+		"SuspensionDamping":  0.99
     }
 }

@@ -12,6 +12,7 @@ import (
 )
 
 var (
+	location  = js.Global.Get("location")
 	document  = js.Global.Get("document")
 	navigator = js.Global.Get("navigator")
 	window    = js.Global.Get("window")
@@ -296,7 +297,7 @@ func Start(c *rpc.Client) {
 }
 
 func main() {
-	c, err := websocket.Dial("ws://localhost:8080/ws")
+	c, err := websocket.Dial(fmt.Sprintf("ws://%s/ws", location.Get("host")))
 	if err != nil {
 		fmt.Println(err)
 	}

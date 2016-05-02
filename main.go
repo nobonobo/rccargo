@@ -146,6 +146,11 @@ func main() {
 	if err := json.NewDecoder(fp).Decode(&profile); err != nil {
 		log.Fatalln(err)
 	}
+	b, err := json.MarshalIndent(profile, "", "  ")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	os.Stderr.Write(b)
 	addr := "0.0.0.0:8080"
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
