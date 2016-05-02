@@ -297,7 +297,11 @@ func Start(c *rpc.Client) {
 }
 
 func main() {
-	c, err := websocket.Dial(fmt.Sprintf("ws://%s/ws", location.Get("host")))
+	scheme := "ws"
+	if location.Get("origin").Call("lastIndexOf", "https", 0).Int() == 0 {
+		scheme = "wss"
+	}
+	c, err := websocket.Dial(fmt.Sprintf("%s://%s/ws", scheme, location.Get("host")))
 	if err != nil {
 		fmt.Println(err)
 	}
