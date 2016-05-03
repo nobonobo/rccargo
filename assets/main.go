@@ -48,7 +48,6 @@ func Start(c *rpc.Client) {
 					v = 0.0
 				}
 				return v
-				//return get().Get("buttons").Index(0).Get("value").Float()
 			}
 		}
 	}
@@ -165,6 +164,55 @@ func Start(c *rpc.Client) {
 	accel, brake := axes[1](), axes[2]()
 	sx, sy := 0.0, 0.0
 	mouse := false
+	apply := func(dx, dy float64) {
+		if dx < -1 {
+			dx = -1
+		}
+		if dx > 1 {
+			dx = 1
+		}
+		if dy < -1 {
+			dy = -1
+		}
+		if dy > 1 {
+			dy = 1
+		}
+		steering = dx
+		if dy < 0.0 {
+			accel = -dy
+			brake = 0.0
+		} else {
+			accel = 0.0
+			brake = dy
+		}
+	}
+	cancel := func(ev *js.Object) {
+		mouse = false
+		steering = axes[0]()
+		accel, brake = axes[1](), axes[2]()
+	}
+	element.Call("addEventListener", "touchstart", func(ev *js.Object) {
+		touches := ev.Get("touches")
+		if touches.Length() > 0 {
+			touch := touches.Index(0)
+			sx = touch.Get("pageX").Float()
+			sy = touch.Get("pageY").Float()
+		}
+	}, false)
+	element.Call("addEventListener", "touchmove", func(ev *js.Object) {
+		touches := ev.Get("touches")
+		if touches.Length() > 0 {
+			mouse = true
+			touch := touches.Index(0)
+			dx := (touch.Get("pageX").Float() - sx) / 200.0
+			dy := (touch.Get("pageY").Float() - sy) / 200.0
+			apply(dx, dy)
+		} else {
+			mouse = false
+		}
+	}, false)
+	element.Call("addEventListener", "touchend", cancel, false)
+	element.Call("addEventListener", "touchcancel", cancel, false)
 	element.Call("addEventListener", "mousedown", func(ev *js.Object) {
 		sx = ev.Get("clientX").Float()
 		sy = ev.Get("clientY").Float()
@@ -175,42 +223,15 @@ func Start(c *rpc.Client) {
 			mouse = true
 			dx := (ev.Get("clientX").Float() - sx) / 200.0
 			dy := (ev.Get("clientY").Float() - sy) / 200.0
-			if dx < -1 {
-				dx = -1
-			}
-			if dx > 1 {
-				dx = 1
-			}
-			if dy < -1 {
-				dy = -1
-			}
-			if dy > 1 {
-				dy = 1
-			}
-			steering = dx
-			if dy < 0.0 {
-				accel = -dy
-				brake = 0.0
-			} else {
-				accel = 0.0
-				brake = dy
-			}
+			apply(dx, dy)
 		} else {
 			mouse = false
 			steering = axes[0]()
 			accel, brake = axes[1](), axes[2]()
 		}
 	}, false)
-	element.Call("addEventListener", "mouseup", func(ev *js.Object) {
-		mouse = false
-		steering = axes[0]()
-		accel, brake = axes[1](), axes[2]()
-	}, false)
-	element.Call("addEventListener", "mouseout", func(ev *js.Object) {
-		mouse = false
-		steering = axes[0]()
-		accel, brake = axes[1](), axes[2]()
-	}, false)
+	element.Call("addEventListener", "mouseup", cancel, false)
+	element.Call("addEventListener", "mouseout", cancel, false)
 
 	update := func() error {
 		if !mouse {
