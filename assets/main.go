@@ -87,12 +87,19 @@ func Start(c *rpc.Client) {
 		camera.Call("updateProjectionMatrix")
 	}, false)
 
-	geometry := THREE.Get("PlaneGeometry").New(20, 20, 32, 32)
+	textureLoader := THREE.Get("TextureLoader").New()
+	texture1 := textureLoader.Call("load", "asphalt.jpg")
+	//maxAnisotropy := renderer.Call("getMaxAnisotropy")
+	//texture1.Set("anisotropy", maxAnisotropy)
+	//texture1.Set("wrapS", THREE.Get("RepeatWrapping"))
+	//texture1.Set("wrapT", THREE.Get("RepeatWrapping"))
+	//texture1.Get("repeat").Call("set", 1024, 1024)
+	geometry := THREE.Get("PlaneGeometry").New(200, 200, 32, 32)
 	geometry.Call("rotateX", -math.Pi/2)
-	material := THREE.Get("MeshLambertMaterial").New(
+	material := THREE.Get("MeshPhongMaterial").New(
 		map[string]interface{}{
-			"color": 0x404040,
-			//"wireframe": true,
+			"color": 0xffffff,
+			"map":   texture1,
 		},
 	)
 	plane := THREE.Get("Mesh").New(geometry, material)
