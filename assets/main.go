@@ -200,6 +200,7 @@ func Start(c *rpc.Client) {
 		}
 	}, false)
 	element.Call("addEventListener", "touchmove", func(ev *js.Object) {
+		ev.Call("preventDefault")
 		touches := ev.Get("touches")
 		if touches.Length() > 0 {
 			mouse = true
