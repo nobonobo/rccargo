@@ -36,10 +36,19 @@ func Start(c *rpc.Client) {
 				return get().Get("axes").Index(0).Float()
 			}
 			axes[1] = func() float64 {
-				return get().Get("axes").Index(3).Float() * -1
+				v := get().Get("axes").Index(3).Float() * -1
+				if v < 0.1 {
+					v = 0.0
+				}
+				return v
 			}
 			axes[2] = func() float64 {
-				return get().Get("buttons").Index(0).Get("value").Float()
+				v := get().Get("axes").Index(3).Float()
+				if v < 0.0 {
+					v = 0.0
+				}
+				return v
+				//return get().Get("buttons").Index(0).Get("value").Float()
 			}
 		}
 	}

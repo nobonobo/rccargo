@@ -25,9 +25,10 @@ var profile = protocol.Profile{
 		ERP:                    0.8,
 		QuickStepW:             1e-3,
 		QuickStepNumIterations: 10,
-		Mu:      1e-6,
-		SoftCfm: 1e-6,
-		SoftErp: 0.3,
+		CollideNum:             2,
+		Mu:                     1e-6,
+		SoftCfm:                1e-6,
+		SoftErp:                0.3,
 	},
 	Vehicle: protocol.VehicleProfile{
 		BodyDensity:        0.05,
@@ -125,10 +126,12 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 	if body1 != 0 && body2 != 0 && body1.Connected(body2) {
 		return
 	}
-	cts := obj1.Collide(obj2, 4, 0)
+	cts := obj1.Collide(obj2, uint16(profile.World.CollideNum), 0)
 	for _, c := range cts {
 		contact := ode.NewContact()
-		contact.Surface.Mode = ode.SoftERPCtParam | ode.SoftCFMCtParam
+		contact.Surface.Mode = ode.Approx1CtParam
+		contact.Surface.Mode |= ode.SoftERPCtParam
+		contact.Surface.Mode |= ode.SoftCFMCtParam
 		contact.Surface.Mu = profile.World.Mu
 		contact.Surface.SoftCfm = profile.World.SoftCfm
 		contact.Surface.SoftErp = profile.World.SoftErp
@@ -150,7 +153,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	os.Stderr.Write(b)
+	fmt.Fprintln(os.Stderr, string(b))
 	addr := "0.0.0.0:8080"
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -164,7 +167,8 @@ func main() {
 	ctx.World.SetERP(profile.World.ERP)
 	ctx.World.SetQuickStepW(profile.World.QuickStepW)
 	ctx.World.SetQuickStepNumIterations(profile.World.QuickStepNumIterations)
-	//ctx.World.SetAutoDisable(false)
+	//ctx.World.SetAutoDisable(true)
+	ctx.World.SetContactMaxCorrectingVelocity(1.0)
 
 	world := &World{
 		ctx:      ctx,

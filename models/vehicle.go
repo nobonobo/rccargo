@@ -93,9 +93,14 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		w.Joint.SetAxis1(ode.V3(0, 1, 0))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
 		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
-		w.Joint.SetParam(ode.FMaxJtParam, 0.01) // 操舵トルク最大値Nm
-		//w.Joint.SetParam(ode.LoStopJtParam, -1.0) // 操舵最小角
-		//w.Joint.SetParam(ode.HiStopJtParam, 1.0)  // 操舵最大角
+		w.Joint.SetParam(ode.FMaxJtParam, 1.0) // 操舵トルク最大値Nm
+		if i/2 == 0 {
+			w.Joint.SetParam(ode.LoStopJtParam, -1.0) // 操舵最小角
+			w.Joint.SetParam(ode.HiStopJtParam, 1.0)  // 操舵最大角
+		} else {
+			w.Joint.SetParam(ode.LoStopJtParam, 0.0) // 操舵最小角
+			w.Joint.SetParam(ode.HiStopJtParam, 0.0) // 操舵最大角
+		}
 
 		k := profile.SuspensionStep * profile.SuspensionSpring
 		base := k + profile.SuspensionDamping
@@ -151,12 +156,16 @@ func (v *Vehicle) Update(in *protocol.Input) {
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*8*10e-6)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*5e-5)
 		} else {
+			factor := 0.55
+			if i < 2 {
+				factor = 0.45
+			}
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, -160.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, in.Accel*8*10e-6)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*5e-5)
 		}
 	}
 }

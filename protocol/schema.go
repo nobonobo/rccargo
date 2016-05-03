@@ -7,6 +7,7 @@ type WorldProfile struct {
 	ERP                    float64
 	QuickStepW             float64
 	QuickStepNumIterations int
+	CollideNum             int
 	Mu                     float64
 	SoftCfm                float64
 	SoftErp                float64
