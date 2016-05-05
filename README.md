@@ -3,9 +3,11 @@ RC-Car Simulator
 
 - ODE physics
 - 1/10 scale RC-Car
-- Multiplayer support(WebRTC-base)
+- Multiplayer support(now:websocket -> future:WebRTC-base)
 
-# Build
+DEMO: https://rccargo.arukascloud.io
+
+# Build and Run
 
 ## OS-X
 
@@ -13,6 +15,7 @@ RC-Car Simulator
 brew install ode --with-shared --with-double-precision
 go get -u github.com/ianremmler/ode
 go get -u github.com/nobonobo/rccargo
+cd $GOPATH/src/github.com/nobonobo/rccargo; rcccargo
 ```
 
 ## Linux
@@ -22,6 +25,13 @@ go get -u github.com/nobonobo/rccargo
 ```sh
 go get -u github.com/ianremmler/ode
 go get -u github.com/nobonobo/rccargo
+cd $GOPATH/src/github.com/nobonobo/rccargo; rcccargo
+```
+
+# Open Browser
+
+```sh
+open http://localhost:8080/
 ```
 
 # Open Dynamics Engine
@@ -63,7 +73,6 @@ direction: (1=x, 2=y, 3=z)
 world parameters:
     ERP = 0.8
     CFM = 1.0e-5
-    step size = 1/100
     gravity = Y(-) 9.8m/s2
 
 Course Setup
@@ -71,16 +80,16 @@ Course Setup
 
 # ode compositions
 
-- World 運動空間
-    - Body 質点
-        - Mass 質量（モーメント形状付き）
-        - Data 任意のデータ
+- World(motion-space)
+    - Body
+        - Mass
+        - Data
 
-- Space 衝突空間
-    - Geom 形状
-        - Data 任意のデータ
+- Space(collision space)
+    - Geom
+        - Data
 
-# join sequence
+# join and update sequence
 
 1. open brouwser assets/index.html
 2. ws connect to host/ws
