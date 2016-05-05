@@ -4,6 +4,7 @@ RC-Car Simulator
 - ODE physics
 - 1/10 scale RC-Car
 - Multiplayer support(now:websocket -> future:WebRTC-base)
+- Gamepad or Mouse or Touch Input
 
 DEMO: https://rccargo.arukascloud.io
 
@@ -34,6 +35,16 @@ cd $GOPATH/src/github.com/nobonobo/rccargo; rcccargo
 open http://localhost:8080/
 ```
 
+# Frontend
+
+- gopherjs base
+- three.js
+
+# Backend
+
+- go websocket and static-files server
+- world simulation by ode
+
 # Open Dynamics Engine
 
 Site:
@@ -62,11 +73,9 @@ document:
 
 GL: right-hand
 
-X: left(+)-right(-)
-Y: up(+)-down(-)
-Z: front(+)-back(-)
-
-direction: (1=x, 2=y, 3=z)
+- X: left(+)-right(-)
+- Y: up(+)-down(-)
+- Z: front(+)-back(-)
 
 # world params
 
@@ -74,8 +83,6 @@ world parameters:
     ERP = 0.8
     CFM = 1.0e-5
     gravity = Y(-) 9.8m/s2
-
-Course Setup
 
 
 # ode compositions
