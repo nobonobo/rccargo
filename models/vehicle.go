@@ -55,9 +55,12 @@ func (w *Wheel) Rotation() ode.Matrix3 {
 
 // Vehicle ...
 type Vehicle struct {
-	body   ode.Body
-	geom   ode.Geom
-	wheels []*Wheel
+	body     ode.Body
+	geom     ode.Geom
+	wheels   []*Wheel
+	accel    float64
+	brake    float64
+	steering float64
 }
 
 // NewVehicle ...
@@ -136,14 +139,9 @@ func (v *Vehicle) Wheel(index int) *Wheel {
 	return v.wheels[index]
 }
 
-func (v *Vehicle) Update(in *protocol.Input) {
-	for i := 0; i < 4; i++ {
-		wheel := v.Wheel(i)
-		angle := 0.0
-		if i < 2 {
-			angle = in.Steering
-		}
-		d := (angle / 2) - wheel.Joint.Angle1()
+func (v *Vehicle) Update() {
+	for _, wheel := range v.wheels {
+		d := (v.steering / 2) - wheel.Joint.Angle1()
 		if d > 2*math.Pi {
 			d = 2 * math.Pi
 		}
@@ -151,6 +149,12 @@ func (v *Vehicle) Update(in *protocol.Input) {
 			d = -2 * math.Pi
 		}
 		wheel.Joint.SetParam(ode.VelJtParam, d*10)
+	}
+}
+
+func (v *Vehicle) Set(in *protocol.Input) {
+	v.steering = in.Steering
+	for i, wheel := range v.wheels {
 		if in.Brake > 0.5 {
 			brake := (in.Brake-0.5)*2 - in.Accel
 			// 動輪目標速度rad/s

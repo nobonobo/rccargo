@@ -48,17 +48,16 @@ var profile = protocol.Profile{
 
 // World ...
 type World struct {
-	ctx      *models.Context
-	vehicles map[string]*models.Vehicle
-	timers   map[string]*time.Timer
+	ctx    *models.Context
+	timers map[string]*time.Timer
 }
 
 // Join ...
 func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
-	if w.vehicles[name] != nil {
+	if w.ctx.GetVehicle(name) != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.vehicles[name] = w.ctx.AddVehicle()
+	w.ctx.AddVehicle(name)
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
@@ -68,13 +67,10 @@ func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 }
 
 func (w *World) gc(name string) {
-	if v := w.vehicles[name]; v != nil {
-		w.ctx.RmVehicle(v)
-	}
+	w.ctx.RmVehicle(name)
 	if tm := w.timers[name]; tm != nil {
 		tm.Stop()
 	}
-	delete(w.vehicles, name)
 	delete(w.timers, name)
 }
 
@@ -87,7 +83,7 @@ func (w *World) Bye(name string, rep *string) error {
 
 // Update ...
 func (w *World) Update(req *protocol.Input, rep *protocol.Output) error {
-	for name, v := range w.vehicles {
+	w.ctx.IterVehicles(func(name string, v *models.Vehicle) {
 		ws := make([]protocol.Attitude, 4)
 		for i := 0; i < 4; i++ {
 			wheel := v.Wheel(i)
@@ -101,13 +97,11 @@ func (w *World) Update(req *protocol.Input, rep *protocol.Output) error {
 		}
 		if req.Name == name {
 			(*rep).Self = pv
-			w.ctx.Lock()
-			v.Update(req)
-			w.ctx.Unlock()
+			v.Set(req)
 		} else {
 			(*rep).Others = append((*rep).Others, pv)
 		}
-	}
+	})
 	if t := w.timers[req.Name]; t != nil {
 		t.Reset(5 * time.Second)
 	}
@@ -171,9 +165,8 @@ func main() {
 	ctx.World.SetContactMaxCorrectingVelocity(1.0)
 
 	world := &World{
-		ctx:      ctx,
-		vehicles: map[string]*models.Vehicle{},
-		timers:   map[string]*time.Timer{},
+		ctx:    ctx,
+		timers: map[string]*time.Timer{},
 	}
 
 	world.ctx.NewPlane(ode.V4(0, 1, 0, -0.5))
