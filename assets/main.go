@@ -65,7 +65,7 @@ func Start(c *rpc.Client) {
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
 	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
-	camera.Get("position").Call("set", 0.1, 0.0, -1.0)
+	camera.Get("position").Call("set", 0.1, 1.0, -1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
 	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
@@ -87,25 +87,15 @@ func Start(c *rpc.Client) {
 		camera.Call("updateProjectionMatrix")
 	}, false)
 
-	textureLoader := THREE.Get("TextureLoader").New()
-	texture1 := textureLoader.Call("load", "asphalt.jpg")
-	//maxAnisotropy := renderer.Call("getMaxAnisotropy")
-	//texture1.Set("anisotropy", maxAnisotropy)
-	//texture1.Set("wrapS", THREE.Get("RepeatWrapping"))
-	//texture1.Set("wrapT", THREE.Get("RepeatWrapping"))
-	//texture1.Get("repeat").Call("set", 1024, 1024)
-	geometry := THREE.Get("PlaneGeometry").New(200, 200, 32, 32)
-	geometry.Call("rotateX", -math.Pi/2)
-	material := THREE.Get("MeshPhongMaterial").New(
-		map[string]interface{}{
-			"color": 0xffffff,
-			"map":   texture1,
-		},
-	)
-	plane := THREE.Get("Mesh").New(geometry, material)
-	plane.Get("position").Set("y", -0.5)
-	plane.Set("receiveShadow", true)
-	scene.Call("add", plane)
+	loader := THREE.Get("ColladaLoader").New()
+	loader.Get("options").Set("convertUpAxis", true)
+	loader.Call("load", "./rc-track.dae", func(collada *js.Object) {
+		fmt.Println("success:", collada)
+		dae := collada.Get("scene")
+		dae.Call("updateMatrix")
+		dae.Set("receiveShadow", true)
+		scene.Call("add", dae)
+	})
 
 	element := renderer.Get("domElement")
 	document.Get("body").Call("appendChild", element)

@@ -29,7 +29,8 @@ func NewWheel(ctx *Context, density, diameter, width float64) *Wheel {
 		-1.0, 0.0, 0.0,
 		0.0, -1.0, 0.0,
 	))
-	geom := ctx.Space.NewCylinder(diameter/2, width)
+	//geom := ctx.Space.NewCylinder(diameter/2, width)
+	geom := ctx.Space.NewSphere(diameter / 2)
 	geom.SetBody(body)
 	joint := ctx.World.NewHinge2Joint(ode.JointGroup(0))
 	return &Wheel{Joint: joint, body: body, geom: geom}
@@ -55,12 +56,14 @@ func (w *Wheel) Rotation() ode.Matrix3 {
 
 // Vehicle ...
 type Vehicle struct {
-	body     ode.Body
-	geom     ode.Geom
-	wheels   []*Wheel
-	accel    float64
-	brake    float64
-	steering float64
+	body      ode.Body
+	geom      ode.Geom
+	wheels    []*Wheel
+	tread     float64
+	wheelbase float64
+	accel     float64
+	brake     float64
+	steering  float64
 }
 
 // NewVehicle ...
@@ -80,18 +83,9 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		)
 		v.wheels = append(v.wheels, w)
 	}
+	v.tread = profile.Tread
+	v.wheelbase = profile.Wheelbase
 	for i, w := range v.wheels {
-		lr := -1.0
-		if i%2 == 0 {
-			lr = 1.0
-		}
-		fr := -1.0
-		if i/2 == 0 {
-			fr = 1.0
-		}
-		x := lr * profile.Tread / 2
-		y := -0.02
-		z := fr * profile.Wheelbase / 2
 		w.Joint.Attach(v.body, w.body)
 		w.Joint.SetAxis1(ode.V3(0, 1, 0))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
@@ -109,6 +103,17 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		base := k + profile.SuspensionDamping
 		w.Joint.SetParam(ode.SuspensionCFMJtParam, k/base)
 		w.Joint.SetParam(ode.SuspensionERPJtParam, 1.0/base)
+		lr := -1.0
+		if i%2 == 0 {
+			lr = 1.0
+		}
+		fr := -1.0
+		if i/2 == 0 {
+			fr = 1.0
+		}
+		x := lr * v.tread / 2
+		y := -0.02
+		z := fr * v.wheelbase / 2
 		w.body.SetPosition(ode.V3(x, y, z))
 		w.Joint.SetAnchor(w.Position())
 	}
@@ -172,4 +177,22 @@ func (v *Vehicle) Set(in *protocol.Input) {
 			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*5e-5)
 		}
 	}
+}
+
+func (v *Vehicle) SetPosition(pos ode.Vector3) {
+	for i, w := range v.wheels {
+		lr := -1.0
+		if i%2 == 0 {
+			lr = 1.0
+		}
+		fr := -1.0
+		if i/2 == 0 {
+			fr = 1.0
+		}
+		x := pos[0] + lr*v.tread/2
+		y := pos[1] - 0.02
+		z := pos[2] + fr*v.wheelbase/2
+		w.body.SetPosition(ode.V3(x, y, z))
+	}
+	v.body.SetPosition(pos)
 }

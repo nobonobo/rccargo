@@ -14,6 +14,7 @@ import (
 	"golang.org/x/net/websocket"
 
 	"github.com/ianremmler/ode"
+
 	"github.com/nobonobo/rccargo/models"
 	"github.com/nobonobo/rccargo/protocol"
 )
@@ -57,7 +58,7 @@ func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 	if w.ctx.GetVehicle(name) != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.ctx.AddVehicle(name)
+	w.ctx.AddVehicle(name, []float64{0.0, 3.0, 0.0})
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
@@ -162,19 +163,64 @@ func main() {
 	ctx.World.SetQuickStepW(profile.World.QuickStepW)
 	ctx.World.SetQuickStepNumIterations(profile.World.QuickStepNumIterations)
 	//ctx.World.SetAutoDisable(true)
-	ctx.World.SetContactMaxCorrectingVelocity(1.0)
+	//ctx.World.SetContactMaxCorrectingVelocity(1.0)
 
 	world := &World{
 		ctx:    ctx,
 		timers: map[string]*time.Timer{},
 	}
 
-	world.ctx.NewPlane(ode.V4(0, 1, 0, -0.5))
+	//world.ctx.Space.NewPlane(ode.V4(0, 1, 0, -0.5))
+
+	model, err := models.LoadSceneAsModel("./assets/rc-track.dae")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	fmt.Printf("model: %#v\n", model)
+	var f func(*models.Model, int)
+	f = func(model *models.Model, level int) {
+		for _, c := range model.Children {
+			fmt.Printf("%*schild: %s %#v\n", level*2, " ", c.Name, c.Geometry)
+			for _, g := range c.Geometry {
+				dat := ode.NewTriMeshData()
+				index := make([]uint32, len(g.Triangles.Index))
+				for i, v := range g.Triangles.Index {
+					index[i] = uint32(v)
+				}
+				dat.Build(
+					ode.NewVertexList(len(g.Triangles.VertexData)/3, g.Triangles.VertexData...),
+					ode.NewTriVertexIndexList(len(index)/3, index...),
+				)
+				tm := world.ctx.Space.NewTriMesh(dat)
+				fmt.Println(tm.AABB())
+
+				//matrix := c.WorldTransform()
+				//	tm.SetPosition([]float64{matrix[12], matrix[13], matrix[14]})
+				//	tm.SetRotation(ode.Matrix3{
+				//		[]float64{matrix[0], matrix[1], matrix[2]},
+				//		[]float64{matrix[4], matrix[5], matrix[6]},
+				//		[]float64{matrix[8], matrix[9], matrix[10]},
+				//	})
+
+				//m := ode.Matrix4{
+				//	[]float64{matrix[0], matrix[1], matrix[2], matrix[3]},
+				//	[]float64{matrix[4], matrix[5], matrix[6], matrix[7]},
+				//	[]float64{matrix[8], matrix[9], matrix[10], matrix[11]},
+				//	[]float64{matrix[12], matrix[13], matrix[14], matrix[15]},
+				//}
+				//tm.SetLastTransform(m)
+			}
+			level++
+			f(c, level)
+		}
+	}
+	f(model, 0)
 
 	go func() {
+		d := 1 * time.Millisecond
 		for {
-			time.Sleep(time.Millisecond)
-			ctx.Iter(time.Millisecond, callback)
+			time.Sleep(d)
+			ctx.Iter(d, callback)
 		}
 	}()
 
