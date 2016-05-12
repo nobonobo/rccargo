@@ -7,7 +7,9 @@ import "C"
 import (
 	"math"
 
+	mgl "github.com/go-gl/mathgl/mgl64"
 	"github.com/ianremmler/ode"
+
 	"github.com/nobonobo/rccargo/protocol"
 )
 
@@ -84,9 +86,11 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 	}
 	v.tread = profile.Tread
 	v.wheelbase = profile.Wheelbase
+	camber := 15.0 // deg
 	for i, w := range v.wheels {
 		w.Joint.Attach(v.body, w.body)
-		w.Joint.SetAxis1(ode.V3(0, 0, -1))
+		ax1 := mgl.HomogRotate3DX(mgl.DegToRad(camber)).Mul4x1(mgl.Vec4{0, 0, -1})
+		w.Joint.SetAxis1(ode.V3(ax1[0], ax1[1], ax1[2]))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
 		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
 		w.Joint.SetParam(ode.FMaxJtParam, 1.0) // 操舵トルク最大値Nm
@@ -112,7 +116,7 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		}
 		x := lr * v.tread / 2
 		y := fr * v.wheelbase / 2
-		z := -0.02
+		z := -0.025
 		w.body.SetPosition(ode.V3(x, y, z))
 		w.Joint.SetAnchor(w.Position())
 	}
@@ -143,16 +147,16 @@ func (v *Vehicle) Wheel(index int) *Wheel {
 	return v.wheels[index]
 }
 
-func (v *Vehicle) Update() {
-	for _, wheel := range v.wheels {
-		d := (v.steering / 2) - wheel.Joint.Angle1()
+func (v *Vehicle) Update(dt float64) {
+	for _, wheel := range v.wheels[:2] {
+		d := (v.steering / 3.0) - wheel.Joint.Angle1()
 		if d > 2*math.Pi {
 			d = 2 * math.Pi
 		}
 		if d < -2*math.Pi {
 			d = -2 * math.Pi
 		}
-		wheel.Joint.SetParam(ode.VelJtParam, d*10)
+		wheel.Joint.SetParam(ode.VelJtParam, d*8*dt*1e3)
 	}
 }
 
@@ -164,7 +168,7 @@ func (v *Vehicle) Set(in *protocol.Input) {
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*5e-5)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*1e-3)
 		} else {
 			factor := 0.55
 			if i < 2 {
@@ -173,7 +177,7 @@ func (v *Vehicle) Set(in *protocol.Input) {
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 160.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*5e-5)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*1e-3)
 		}
 	}
 }
@@ -190,7 +194,7 @@ func (v *Vehicle) SetPosition(pos ode.Vector3) {
 		}
 		x := pos[0] + lr*v.tread/2
 		y := pos[1] + fr*v.wheelbase/2
-		z := pos[2] - 0.02
+		z := pos[2] - 0.025
 		w.body.SetPosition(ode.V3(x, y, z))
 	}
 	v.body.SetPosition(pos)

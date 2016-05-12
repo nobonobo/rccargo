@@ -16,7 +16,7 @@ func init() {
 type Context struct {
 	sync.RWMutex
 	ode.World
-	Space      ode.HashSpace
+	Space      ode.Space
 	JointGroup ode.JointGroup
 	Profile    protocol.Profile
 	vehicles   map[string]*Vehicle
@@ -27,7 +27,7 @@ func NewContext(profile protocol.Profile) *Context {
 	return &Context{
 		World:      ode.NewWorld(),
 		Space:      ode.NilSpace().NewHashSpace(),
-		JointGroup: ode.NewJointGroup(10000),
+		JointGroup: ode.NewJointGroup(1000),
 		Profile:    profile,
 		vehicles:   map[string]*Vehicle{},
 	}
@@ -37,12 +37,12 @@ func NewContext(profile protocol.Profile) *Context {
 func (ctx *Context) Iter(step time.Duration, callback ode.NearCallback) {
 	ctx.Lock()
 	defer ctx.Unlock()
+	dt := float64(step) / float64(time.Second)
 	for _, v := range ctx.vehicles {
-		v.Update()
+		v.Update(dt)
 	}
 	ctx.Space.Collide(ctx, callback)
-	ctx.World.QuickStep(float64(step) / float64(time.Second))
-	//ctx.World.Step(float64(step) / float64(time.Second))
+	ctx.World.QuickStep(dt)
 	ctx.JointGroup.Empty()
 }
 

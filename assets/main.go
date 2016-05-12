@@ -64,21 +64,21 @@ func Start(c *rpc.Client) {
 	//cameraPan := 0.0
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
-	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
+	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 1000)
 	camera.Get("up").Call("set", 0.0, 0.0, 1.0)
 	camera.Get("position").Call("set", 0.0, -1.0, +1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
 	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
-	sunlight.Get("position").Call("set", 100, 100, 100)
+	sunlight.Set("radius", 30.0)
+	sunlight.Get("position").Call("set", 5, 5, 10)
 	sunlight.Set("castShadow", true)
-	/*
-		sunlight.Set("shadow", THREE.Get("LightShadow").New(
-			THREE.Get("PerspectiveCamera").New(50, 1, 1200, 2500)))
-		sunlight.Get("shadow").Set("bias", 0.0001)
-		sunlight.Get("shadow").Get("mapSize").Set("width", 256)
-		sunlight.Get("shadow").Get("mapSize").Set("height", 256)
-	*/
+	sunlight.Get("shadow").Get("camera").Set("top", 25.0)
+	sunlight.Get("shadow").Get("camera").Set("bottom", -25.0)
+	sunlight.Get("shadow").Get("camera").Set("left", -25.0)
+	sunlight.Get("shadow").Get("camera").Set("right", 25.0)
+	sunlight.Get("shadow").Get("mapSize").Set("width", 1024)
+	sunlight.Get("shadow").Get("mapSize").Set("height", 1024)
 	scene.Call("add", sunlight)
 
 	window.Call("addEventListener", "resize", func() {
@@ -95,21 +95,12 @@ func Start(c *rpc.Client) {
 		dae := collada.Get("scene")
 		dae.Get("up").Call("set", 0, 0, 1)
 		//dae.Call("updateMatrix")
-		var f func(node *js.Object)
-		f = func(node *js.Object) {
-			//if node.Get("type").String() == "Mesh" {
-			node.Set("receiveShadow", true)
-			//}
-			children := node.Get("children")
-			if children != js.Undefined {
-				for i := 0; i < children.Length(); i++ {
-					f(children.Index(i))
-				}
-			}
-		}
-		js.Global.Set("dae", dae)
-		f(dae.Get("children"))
-		fmt.Println(js.Keys(dae))
+		dae.Call("traverse",
+			func(child *js.Object) {
+				//child.Set("castShadow", true)
+				child.Set("receiveShadow", true)
+			},
+		)
 		geoms := collada.Get("loader")
 		for _, k := range js.Keys(geoms) {
 			fmt.Println(geoms.Get(k).Get("boundingBox"))
@@ -145,7 +136,7 @@ func Start(c *rpc.Client) {
 	fmt.Println("profile:", profile)
 	build := func(name string) {
 		geometry := THREE.Get("BoxGeometry").New(
-			profile.BodyBox[0]/2,
+			profile.BodyBox[0],
 			profile.BodyBox[1],
 			profile.BodyBox[2],
 		)
@@ -168,7 +159,10 @@ func Start(c *rpc.Client) {
 				geometry.Call("rotateZ", -math.Pi/2)
 			}
 			material := THREE.Get("MeshStandardMaterial").New(
-				map[string]interface{}{"color": 0x8080ff, "wireframe": true},
+				map[string]interface{}{
+					"color": 0x8080ff,
+					//"wireframe": true,
+				},
 			)
 			tire := THREE.Get("Mesh").New(geometry, material)
 			tire.Set("name", fmt.Sprintf("%s-tire%d", name, i))

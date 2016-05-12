@@ -132,7 +132,9 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 		contact.Surface.SoftCfm = profile.World.SoftCfm
 		contact.Surface.SoftErp = profile.World.SoftErp
 		contact.Geom = c
-		ct := ctx.World.NewContactJoint(ctx.JointGroup, contact)
+		ct := ctx.World.NewContactJoint(
+			ctx.JointGroup, contact,
+		)
 		ct.Attach(body1, body2)
 	}
 }
@@ -216,9 +218,10 @@ func main() {
 	f(root, 0)
 
 	go func() {
-		d := 1 * time.Millisecond
+		d := 10 * time.Millisecond
+		tick := time.NewTicker(d)
 		for {
-			time.Sleep(d)
+			<-tick.C
 			ctx.Iter(d, callback)
 		}
 	}()
