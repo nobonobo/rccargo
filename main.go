@@ -13,6 +13,7 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	glm "github.com/Jragonmiris/mathgl"
 	"github.com/ianremmler/ode"
 
 	"github.com/nobonobo/rccargo/models"
@@ -21,7 +22,7 @@ import (
 
 var profile = protocol.Profile{
 	World: protocol.WorldProfile{
-		Gravity:                []float64{0, -9.80665, 0},
+		Gravity:                []float64{0, 0, -9.80665},
 		CFM:                    10e-5,
 		ERP:                    0.8,
 		QuickStepW:             1e-3,
@@ -58,7 +59,7 @@ func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 	if w.ctx.GetVehicle(name) != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.ctx.AddVehicle(name, []float64{0.0, 3.0, 0.0})
+	w.ctx.AddVehicle(name, []float64{-1.0, 1.0, 0.5})
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
@@ -172,17 +173,30 @@ func main() {
 
 	//world.ctx.Space.NewPlane(ode.V4(0, 1, 0, -0.5))
 
-	model, err := models.LoadSceneAsModel("./assets/rc-track.dae")
+	root, err := models.LoadSceneAsModel("./assets/rc-track.dae")
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Printf("model: %#v\n", model)
 	var f func(*models.Model, int)
 	f = func(model *models.Model, level int) {
 		for _, c := range model.Children {
-			fmt.Printf("%*schild: %s %#v\n", level*2, " ", c.Name, c.Geometry)
+			matrix := c.Transform // c.WorldTransform()
+			fmt.Printf("%*schild: %s(%d) %#v\n", level*2, " ", c.Name, len(c.Geometry), matrix)
 			for _, g := range c.Geometry {
 				dat := ode.NewTriMeshData()
+				for i := 0; i < len(g.Triangles.VertexData); i += 3 {
+					v := glm.Vec4d{
+						g.Triangles.VertexData[i+0],
+						g.Triangles.VertexData[i+1],
+						g.Triangles.VertexData[i+2],
+						1.0,
+					}
+					pv := matrix.Mul4x1(v).Mul(root.Unit)
+					g.Triangles.VertexData[i+0] = pv[0]
+					g.Triangles.VertexData[i+1] = pv[1]
+					g.Triangles.VertexData[i+2] = pv[2]
+				}
+
 				index := make([]uint32, len(g.Triangles.Index))
 				for i, v := range g.Triangles.Index {
 					index[i] = uint32(v)
@@ -192,29 +206,14 @@ func main() {
 					ode.NewTriVertexIndexList(len(index)/3, index...),
 				)
 				tm := world.ctx.Space.NewTriMesh(dat)
+
 				fmt.Println(tm.AABB())
-
-				//matrix := c.WorldTransform()
-				//	tm.SetPosition([]float64{matrix[12], matrix[13], matrix[14]})
-				//	tm.SetRotation(ode.Matrix3{
-				//		[]float64{matrix[0], matrix[1], matrix[2]},
-				//		[]float64{matrix[4], matrix[5], matrix[6]},
-				//		[]float64{matrix[8], matrix[9], matrix[10]},
-				//	})
-
-				//m := ode.Matrix4{
-				//	[]float64{matrix[0], matrix[1], matrix[2], matrix[3]},
-				//	[]float64{matrix[4], matrix[5], matrix[6], matrix[7]},
-				//	[]float64{matrix[8], matrix[9], matrix[10], matrix[11]},
-				//	[]float64{matrix[12], matrix[13], matrix[14], matrix[15]},
-				//}
-				//tm.SetLastTransform(m)
 			}
 			level++
 			f(c, level)
 		}
 	}
-	f(model, 0)
+	f(root, 0)
 
 	go func() {
 		d := 1 * time.Millisecond

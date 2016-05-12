@@ -65,7 +65,8 @@ func Start(c *rpc.Client) {
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
 	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
-	camera.Get("position").Call("set", 0.1, 1.0, -1.0)
+	camera.Get("up").Call("set", 0.0, 0.0, 1.0)
+	camera.Get("position").Call("set", 0.0, -1.0, +1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
 	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
@@ -88,12 +89,31 @@ func Start(c *rpc.Client) {
 	}, false)
 
 	loader := THREE.Get("ColladaLoader").New()
-	loader.Get("options").Set("convertUpAxis", true)
+	//loader.Get("options").Set("convertUpAxis", false)
 	loader.Call("load", "./rc-track.dae", func(collada *js.Object) {
 		fmt.Println("success:", collada)
 		dae := collada.Get("scene")
-		dae.Call("updateMatrix")
-		dae.Set("receiveShadow", true)
+		dae.Get("up").Call("set", 0, 0, 1)
+		//dae.Call("updateMatrix")
+		var f func(node *js.Object)
+		f = func(node *js.Object) {
+			//if node.Get("type").String() == "Mesh" {
+			node.Set("receiveShadow", true)
+			//}
+			children := node.Get("children")
+			if children != js.Undefined {
+				for i := 0; i < children.Length(); i++ {
+					f(children.Index(i))
+				}
+			}
+		}
+		js.Global.Set("dae", dae)
+		f(dae.Get("children"))
+		fmt.Println(js.Keys(dae))
+		geoms := collada.Get("loader")
+		for _, k := range js.Keys(geoms) {
+			fmt.Println(geoms.Get(k).Get("boundingBox"))
+		}
 		scene.Call("add", dae)
 	})
 
@@ -129,7 +149,7 @@ func Start(c *rpc.Client) {
 			profile.BodyBox[1],
 			profile.BodyBox[2],
 		)
-		material := THREE.Get("MeshLambertMaterial").New(
+		material := THREE.Get("MeshStandardMaterial").New(
 			map[string]interface{}{"color": 0xffffff},
 		)
 		body := THREE.Get("Mesh").New(geometry, material)
@@ -147,7 +167,7 @@ func Start(c *rpc.Client) {
 			} else {
 				geometry.Call("rotateZ", -math.Pi/2)
 			}
-			material := THREE.Get("MeshLambertMaterial").New(
+			material := THREE.Get("MeshStandardMaterial").New(
 				map[string]interface{}{"color": 0x8080ff, "wireframe": true},
 			)
 			tire := THREE.Get("Mesh").New(geometry, material)
