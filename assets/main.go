@@ -64,20 +64,21 @@ func Start(c *rpc.Client) {
 	//cameraPan := 0.0
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
-	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
-	camera.Get("position").Call("set", 0.1, 0.0, -1.0)
+	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 1000)
+	camera.Get("up").Call("set", 0.0, 0.0, 1.0)
+	camera.Get("position").Call("set", 0.0, -1.0, +1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
 	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
-	sunlight.Get("position").Call("set", 100, 100, 100)
+	sunlight.Set("radius", 30.0)
+	sunlight.Get("position").Call("set", 5, 5, 10)
 	sunlight.Set("castShadow", true)
-	/*
-		sunlight.Set("shadow", THREE.Get("LightShadow").New(
-			THREE.Get("PerspectiveCamera").New(50, 1, 1200, 2500)))
-		sunlight.Get("shadow").Set("bias", 0.0001)
-		sunlight.Get("shadow").Get("mapSize").Set("width", 256)
-		sunlight.Get("shadow").Get("mapSize").Set("height", 256)
-	*/
+	sunlight.Get("shadow").Get("camera").Set("top", 25.0)
+	sunlight.Get("shadow").Get("camera").Set("bottom", -25.0)
+	sunlight.Get("shadow").Get("camera").Set("left", -25.0)
+	sunlight.Get("shadow").Get("camera").Set("right", 25.0)
+	sunlight.Get("shadow").Get("mapSize").Set("width", 1024)
+	sunlight.Get("shadow").Get("mapSize").Set("height", 1024)
 	scene.Call("add", sunlight)
 
 	window.Call("addEventListener", "resize", func() {
@@ -87,25 +88,25 @@ func Start(c *rpc.Client) {
 		camera.Call("updateProjectionMatrix")
 	}, false)
 
-	textureLoader := THREE.Get("TextureLoader").New()
-	texture1 := textureLoader.Call("load", "asphalt.jpg")
-	//maxAnisotropy := renderer.Call("getMaxAnisotropy")
-	//texture1.Set("anisotropy", maxAnisotropy)
-	//texture1.Set("wrapS", THREE.Get("RepeatWrapping"))
-	//texture1.Set("wrapT", THREE.Get("RepeatWrapping"))
-	//texture1.Get("repeat").Call("set", 1024, 1024)
-	geometry := THREE.Get("PlaneGeometry").New(200, 200, 32, 32)
-	geometry.Call("rotateX", -math.Pi/2)
-	material := THREE.Get("MeshPhongMaterial").New(
-		map[string]interface{}{
-			"color": 0xffffff,
-			"map":   texture1,
-		},
-	)
-	plane := THREE.Get("Mesh").New(geometry, material)
-	plane.Get("position").Set("y", -0.5)
-	plane.Set("receiveShadow", true)
-	scene.Call("add", plane)
+	loader := THREE.Get("ColladaLoader").New()
+	//loader.Get("options").Set("convertUpAxis", false)
+	loader.Call("load", "./rc-track.dae", func(collada *js.Object) {
+		fmt.Println("success:", collada)
+		dae := collada.Get("scene")
+		dae.Get("up").Call("set", 0, 0, 1)
+		//dae.Call("updateMatrix")
+		dae.Call("traverse",
+			func(child *js.Object) {
+				//child.Set("castShadow", true)
+				child.Set("receiveShadow", true)
+			},
+		)
+		geoms := collada.Get("loader")
+		for _, k := range js.Keys(geoms) {
+			fmt.Println(geoms.Get(k).Get("boundingBox"))
+		}
+		scene.Call("add", dae)
+	})
 
 	element := renderer.Get("domElement")
 	document.Get("body").Call("appendChild", element)
@@ -135,11 +136,11 @@ func Start(c *rpc.Client) {
 	fmt.Println("profile:", profile)
 	build := func(name string) {
 		geometry := THREE.Get("BoxGeometry").New(
-			profile.BodyBox[0]/2,
+			profile.BodyBox[0],
 			profile.BodyBox[1],
 			profile.BodyBox[2],
 		)
-		material := THREE.Get("MeshLambertMaterial").New(
+		material := THREE.Get("MeshStandardMaterial").New(
 			map[string]interface{}{"color": 0xffffff},
 		)
 		body := THREE.Get("Mesh").New(geometry, material)
@@ -157,8 +158,11 @@ func Start(c *rpc.Client) {
 			} else {
 				geometry.Call("rotateZ", -math.Pi/2)
 			}
-			material := THREE.Get("MeshLambertMaterial").New(
-				map[string]interface{}{"color": 0x8080ff, "wireframe": true},
+			material := THREE.Get("MeshStandardMaterial").New(
+				map[string]interface{}{
+					"color": 0x8080ff,
+					//"wireframe": true,
+				},
 			)
 			tire := THREE.Get("Mesh").New(geometry, material)
 			tire.Set("name", fmt.Sprintf("%s-tire%d", name, i))

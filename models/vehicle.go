@@ -7,7 +7,9 @@ import "C"
 import (
 	"math"
 
+	mgl "github.com/go-gl/mathgl/mgl64"
 	"github.com/ianremmler/ode"
+
 	"github.com/nobonobo/rccargo/protocol"
 )
 
@@ -21,14 +23,14 @@ type Wheel struct {
 // NewWheel ...
 func NewWheel(ctx *Context, density, diameter, width float64) *Wheel {
 	body := ctx.World.NewBody()
-	mass := ode.NewMass()
-	mass.SetCylinder(density, 1, diameter/2, width) // 1: x-axis length = width
-	body.SetMass(mass)
 	body.SetRotation(ode.NewMatrix3(
 		0.0, 0.0, 1.0,
 		-1.0, 0.0, 0.0,
 		0.0, -1.0, 0.0,
 	))
+	mass := ode.NewMass()
+	mass.SetCylinder(density, 1, diameter/2, width) // 1: x-axis length = width
+	body.SetMass(mass)
 	geom := ctx.Space.NewCylinder(diameter/2, width)
 	geom.SetBody(body)
 	joint := ctx.World.NewHinge2Joint(ode.JointGroup(0))
@@ -55,12 +57,14 @@ func (w *Wheel) Rotation() ode.Matrix3 {
 
 // Vehicle ...
 type Vehicle struct {
-	body     ode.Body
-	geom     ode.Geom
-	wheels   []*Wheel
-	accel    float64
-	brake    float64
-	steering float64
+	body      ode.Body
+	geom      ode.Geom
+	wheels    []*Wheel
+	tread     float64
+	wheelbase float64
+	accel     float64
+	brake     float64
+	steering  float64
 }
 
 // NewVehicle ...
@@ -80,20 +84,13 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		)
 		v.wheels = append(v.wheels, w)
 	}
+	v.tread = profile.Tread
+	v.wheelbase = profile.Wheelbase
+	camber := 15.0 // deg
 	for i, w := range v.wheels {
-		lr := -1.0
-		if i%2 == 0 {
-			lr = 1.0
-		}
-		fr := -1.0
-		if i/2 == 0 {
-			fr = 1.0
-		}
-		x := lr * profile.Tread / 2
-		y := -0.02
-		z := fr * profile.Wheelbase / 2
 		w.Joint.Attach(v.body, w.body)
-		w.Joint.SetAxis1(ode.V3(0, 1, 0))
+		ax1 := mgl.HomogRotate3DX(mgl.DegToRad(camber)).Mul4x1(mgl.Vec4{0, 0, -1})
+		w.Joint.SetAxis1(ode.V3(ax1[0], ax1[1], ax1[2]))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
 		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
 		w.Joint.SetParam(ode.FMaxJtParam, 1.0) // 操舵トルク最大値Nm
@@ -109,6 +106,17 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		base := k + profile.SuspensionDamping
 		w.Joint.SetParam(ode.SuspensionCFMJtParam, k/base)
 		w.Joint.SetParam(ode.SuspensionERPJtParam, 1.0/base)
+		lr := 1.0
+		if i%2 == 0 {
+			lr = -1.0
+		}
+		fr := -1.0
+		if i/2 == 0 {
+			fr = 1.0
+		}
+		x := lr * v.tread / 2
+		y := fr * v.wheelbase / 2
+		z := -0.025
 		w.body.SetPosition(ode.V3(x, y, z))
 		w.Joint.SetAnchor(w.Position())
 	}
@@ -139,37 +147,55 @@ func (v *Vehicle) Wheel(index int) *Wheel {
 	return v.wheels[index]
 }
 
-func (v *Vehicle) Update() {
-	for _, wheel := range v.wheels {
-		d := (v.steering / 2) - wheel.Joint.Angle1()
+func (v *Vehicle) Update(dt float64) {
+	for _, wheel := range v.wheels[:2] {
+		d := (v.steering / 3.0) - wheel.Joint.Angle1()
 		if d > 2*math.Pi {
 			d = 2 * math.Pi
 		}
 		if d < -2*math.Pi {
 			d = -2 * math.Pi
 		}
-		wheel.Joint.SetParam(ode.VelJtParam, d*10)
+		wheel.Joint.SetParam(ode.VelJtParam, d*8*dt*1e3)
 	}
 }
 
 func (v *Vehicle) Set(in *protocol.Input) {
-	v.steering = in.Steering
+	v.steering = -in.Steering
 	for i, wheel := range v.wheels {
 		if in.Brake > 0.5 {
 			brake := (in.Brake-0.5)*2 - in.Accel
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*5e-5)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*1e-3)
 		} else {
 			factor := 0.55
 			if i < 2 {
 				factor = 0.45
 			}
 			// 動輪目標速度rad/s
-			wheel.Joint.SetParam(ode.VelJtParam2, -160.0)
+			wheel.Joint.SetParam(ode.VelJtParam2, 160.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*5e-5)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*1e-3)
 		}
 	}
+}
+
+func (v *Vehicle) SetPosition(pos ode.Vector3) {
+	for i, w := range v.wheels {
+		lr := 1.0
+		if i%2 == 0 {
+			lr = -1.0
+		}
+		fr := -1.0
+		if i/2 == 0 {
+			fr = 1.0
+		}
+		x := pos[0] + lr*v.tread/2
+		y := pos[1] + fr*v.wheelbase/2
+		z := pos[2] - 0.025
+		w.body.SetPosition(ode.V3(x, y, z))
+	}
+	v.body.SetPosition(pos)
 }

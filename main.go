@@ -13,14 +13,16 @@ import (
 
 	"golang.org/x/net/websocket"
 
+	glm "github.com/Jragonmiris/mathgl"
 	"github.com/ianremmler/ode"
+
 	"github.com/nobonobo/rccargo/models"
 	"github.com/nobonobo/rccargo/protocol"
 )
 
 var profile = protocol.Profile{
 	World: protocol.WorldProfile{
-		Gravity:                []float64{0, -9.80665, 0},
+		Gravity:                []float64{0, 0, -9.80665},
 		CFM:                    10e-5,
 		ERP:                    0.8,
 		QuickStepW:             1e-3,
@@ -57,7 +59,7 @@ func (w *World) Join(name string, rep *protocol.VehicleProfile) error {
 	if w.ctx.GetVehicle(name) != nil {
 		return fmt.Errorf("duplicated name: %s", name)
 	}
-	w.ctx.AddVehicle(name)
+	w.ctx.AddVehicle(name, []float64{-1.0, 1.0, 0.5})
 	w.timers[name] = time.AfterFunc(5*time.Second, func() {
 		w.gc(name)
 	})
@@ -130,7 +132,9 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 		contact.Surface.SoftCfm = profile.World.SoftCfm
 		contact.Surface.SoftErp = profile.World.SoftErp
 		contact.Geom = c
-		ct := ctx.World.NewContactJoint(ctx.JointGroup, contact)
+		ct := ctx.World.NewContactJoint(
+			ctx.JointGroup, contact,
+		)
 		ct.Attach(body1, body2)
 	}
 }
@@ -162,19 +166,63 @@ func main() {
 	ctx.World.SetQuickStepW(profile.World.QuickStepW)
 	ctx.World.SetQuickStepNumIterations(profile.World.QuickStepNumIterations)
 	//ctx.World.SetAutoDisable(true)
-	ctx.World.SetContactMaxCorrectingVelocity(1.0)
+	//ctx.World.SetContactMaxCorrectingVelocity(1.0)
 
 	world := &World{
 		ctx:    ctx,
 		timers: map[string]*time.Timer{},
 	}
 
-	world.ctx.NewPlane(ode.V4(0, 1, 0, -0.5))
+	//world.ctx.Space.NewPlane(ode.V4(0, 1, 0, -0.5))
+
+	root, err := models.LoadSceneAsModel("./assets/rc-track.dae")
+	if err != nil {
+		log.Fatalln(err)
+	}
+	var f func(*models.Model, int)
+	f = func(model *models.Model, level int) {
+		for _, c := range model.Children {
+			matrix := c.Transform // c.WorldTransform()
+			fmt.Printf("%*schild: %s(%d) %#v\n", level*2, " ", c.Name, len(c.Geometry), matrix)
+			for _, g := range c.Geometry {
+				dat := ode.NewTriMeshData()
+				for i := 0; i < len(g.Triangles.VertexData); i += 3 {
+					v := glm.Vec4d{
+						g.Triangles.VertexData[i+0],
+						g.Triangles.VertexData[i+1],
+						g.Triangles.VertexData[i+2],
+						1.0,
+					}
+					pv := matrix.Mul4x1(v).Mul(root.Unit)
+					g.Triangles.VertexData[i+0] = pv[0]
+					g.Triangles.VertexData[i+1] = pv[1]
+					g.Triangles.VertexData[i+2] = pv[2]
+				}
+
+				index := make([]uint32, len(g.Triangles.Index))
+				for i, v := range g.Triangles.Index {
+					index[i] = uint32(v)
+				}
+				dat.Build(
+					ode.NewVertexList(len(g.Triangles.VertexData)/3, g.Triangles.VertexData...),
+					ode.NewTriVertexIndexList(len(index)/3, index...),
+				)
+				tm := world.ctx.Space.NewTriMesh(dat)
+
+				fmt.Println(tm.AABB())
+			}
+			level++
+			f(c, level)
+		}
+	}
+	f(root, 0)
 
 	go func() {
+		d := 10 * time.Millisecond
+		tick := time.NewTicker(d)
 		for {
-			time.Sleep(time.Millisecond)
-			ctx.Iter(time.Millisecond, callback)
+			<-tick.C
+			ctx.Iter(d, callback)
 		}
 	}()
 

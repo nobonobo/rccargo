@@ -73,17 +73,16 @@ document:
 
 GL: right-hand
 
-- X: left(+)-right(-)
-- Y: up(+)-down(-)
-- Z: front(+)-back(-)
+- X: left(-)-right(+)
+- Y: front(+)-back(-)
+- Z: up(+)-down(-)
 
 # world params
 
 world parameters:
-    ERP = 0.8
-    CFM = 1.0e-5
-    gravity = Y(-) 9.8m/s2
-
+    - ERP = 0.8
+    - CFM = 1.0e-5
+    - gravity = -9.8m/s2(Z)
 
 # ode compositions
 
