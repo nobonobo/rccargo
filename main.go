@@ -42,9 +42,8 @@ var profile = protocol.Profile{
 		TireDiameter:       0.088,
 		TireWidth:          0.033,
 		FudgeFactorJtParam: 0.01,
-		SuspensionStep:     1.0,
-		SuspensionSpring:   100,
-		SuspensionDamping:  0.1,
+		SuspensionCFM:      1.0e-5,
+		SuspensionERP:      0.8,
 	},
 }
 
@@ -117,6 +116,10 @@ func (w *World) handle(ws *websocket.Conn) {
 }
 
 func callback(data interface{}, obj1, obj2 ode.Geom) {
+	if obj1.IsSpace() && obj2.IsSpace() {
+		obj1.Collide2(obj2, 0, callback)
+		return
+	}
 	ctx := data.(*models.Context)
 	body1, body2 := obj1.Body(), obj2.Body()
 	if body1 != 0 && body2 != 0 && body1.Connected(body2) {
@@ -126,11 +129,11 @@ func callback(data interface{}, obj1, obj2 ode.Geom) {
 	for _, c := range cts {
 		contact := ode.NewContact()
 		contact.Surface.Mode = ode.Approx1CtParam
-		contact.Surface.Mode |= ode.SoftERPCtParam
-		contact.Surface.Mode |= ode.SoftCFMCtParam
+		//contact.Surface.Mode |= ode.SoftERPCtParam
+		//contact.Surface.Mode |= ode.SoftCFMCtParam
 		contact.Surface.Mu = profile.World.Mu
-		contact.Surface.SoftCfm = profile.World.SoftCfm
-		contact.Surface.SoftErp = profile.World.SoftErp
+		//contact.Surface.SoftCfm = profile.World.SoftCfm
+		//contact.Surface.SoftErp = profile.World.SoftErp
 		contact.Geom = c
 		ct := ctx.World.NewContactJoint(
 			ctx.JointGroup, contact,
@@ -165,7 +168,7 @@ func main() {
 	ctx.World.SetERP(profile.World.ERP)
 	ctx.World.SetQuickStepW(profile.World.QuickStepW)
 	ctx.World.SetQuickStepNumIterations(profile.World.QuickStepNumIterations)
-	//ctx.World.SetAutoDisable(true)
+	ctx.World.SetAutoDisable(true)
 	//ctx.World.SetContactMaxCorrectingVelocity(1.0)
 
 	world := &World{

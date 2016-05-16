@@ -29,7 +29,8 @@ func NewWheel(ctx *Context, density, diameter, width float64) *Wheel {
 		0.0, -1.0, 0.0,
 	))
 	mass := ode.NewMass()
-	mass.SetCylinder(density, 1, diameter/2, width) // 1: x-axis length = width
+	mass.SetCylinderTotal(density, 1, diameter/2, width) // 1: x-axis length = width
+	//mass.SetCylinder(density, 1, diameter/2, width) // 1: x-axis length = width
 	body.SetMass(mass)
 	geom := ctx.Space.NewCylinder(diameter/2, width)
 	geom.SetBody(body)
@@ -73,7 +74,8 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 	geom := ctx.Space.NewBox(profile.BodyBox)
 	geom.SetBody(body)
 	mass := ode.NewMass()
-	mass.SetBox(profile.BodyDensity, profile.BodyBox)
+	mass.SetBoxTotal(profile.BodyDensity, profile.BodyBox)
+	//mass.SetBox(profile.BodyDensity, profile.BodyBox)
 	body.SetMass(mass)
 	v := &Vehicle{body: body, geom: geom, wheels: []*Wheel{}}
 	for i := 0; i < 4; i++ {
@@ -89,23 +91,38 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 	camber := 15.0 // deg
 	for i, w := range v.wheels {
 		w.Joint.Attach(v.body, w.body)
-		ax1 := mgl.HomogRotate3DX(mgl.DegToRad(camber)).Mul4x1(mgl.Vec4{0, 0, -1})
-		w.Joint.SetAxis1(ode.V3(ax1[0], ax1[1], ax1[2]))
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
 		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
 		w.Joint.SetParam(ode.FMaxJtParam, 1.0) // 操舵トルク最大値Nm
 		if i/2 == 0 {
+			ax1 := mgl.HomogRotate3DX(mgl.DegToRad(camber)).Mul4x1(mgl.Vec4{0, 0, -1})
+			w.Joint.SetAxis1(ode.V3(ax1[0], ax1[1], ax1[2]))
 			w.Joint.SetParam(ode.LoStopJtParam, -1.0) // 操舵最小角
 			w.Joint.SetParam(ode.HiStopJtParam, 1.0)  // 操舵最大角
 		} else {
-			w.Joint.SetParam(ode.LoStopJtParam, 0.0) // 操舵最小角
-			w.Joint.SetParam(ode.HiStopJtParam, 0.0) // 操舵最大角
+			w.Joint.SetAxis1(ode.V3(0.0, 0.0, -1.0))
+			w.Joint.SetParam(ode.LoStopJtParam, 0.0)     // 操舵最小角
+			w.Joint.SetParam(ode.HiStopJtParam, 0.0)     // 操舵最大角
+			w.Joint.SetParam(ode.CFMJtParam, 1e-30)      //
+			w.Joint.SetParam(ode.CFMJtParam1, 1e-30)     //
+			w.Joint.SetParam(ode.CFMJtParam2, 1e-30)     //
+			w.Joint.SetParam(ode.CFMJtParam3, 1e-30)     //
+			w.Joint.SetParam(ode.StopCFMJtParam, 1e-30)  //
+			w.Joint.SetParam(ode.StopCFMJtParam1, 1e-30) //
+			w.Joint.SetParam(ode.StopCFMJtParam2, 1e-30) //
+			w.Joint.SetParam(ode.StopCFMJtParam3, 1e-30) //
+			w.Joint.SetParam(ode.ERPJtParam, 1.0)        //
+			w.Joint.SetParam(ode.ERPJtParam1, 1.0)       //
+			w.Joint.SetParam(ode.ERPJtParam2, 1.0)       //
+			w.Joint.SetParam(ode.ERPJtParam3, 1.0)       //
+			w.Joint.SetParam(ode.StopERPJtParam, 1.0)    //
+			w.Joint.SetParam(ode.StopERPJtParam1, 1.0)   //
+			w.Joint.SetParam(ode.StopERPJtParam2, 1.0)   //
+			w.Joint.SetParam(ode.StopERPJtParam3, 1.0)   //
 		}
-
-		k := profile.SuspensionStep * profile.SuspensionSpring
-		base := k + profile.SuspensionDamping
-		w.Joint.SetParam(ode.SuspensionCFMJtParam, k/base)
-		w.Joint.SetParam(ode.SuspensionERPJtParam, 1.0/base)
+		w.Joint.SetParam(ode.BounceJtParam, 0.5)
+		w.Joint.SetParam(ode.SuspensionCFMJtParam, profile.SuspensionCFM)
+		w.Joint.SetParam(ode.SuspensionERPJtParam, profile.SuspensionERP)
 		lr := 1.0
 		if i%2 == 0 {
 			lr = -1.0
@@ -116,7 +133,7 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 		}
 		x := lr * v.tread / 2
 		y := fr * v.wheelbase / 2
-		z := -0.025
+		z := -0.0
 		w.body.SetPosition(ode.V3(x, y, z))
 		w.Joint.SetAnchor(w.Position())
 	}
@@ -156,28 +173,31 @@ func (v *Vehicle) Update(dt float64) {
 		if d < -2*math.Pi {
 			d = -2 * math.Pi
 		}
-		wheel.Joint.SetParam(ode.VelJtParam, d*8*dt*1e3)
+		wheel.Joint.SetParam(ode.VelJtParam, d*dt*1e4)
 	}
 }
 
 func (v *Vehicle) Set(in *protocol.Input) {
 	v.steering = -in.Steering
 	for i, wheel := range v.wheels {
+		// 動摩擦力?
+		//rate := math.Abs(wheel.body.AngularVel()[0] / 150.0)
 		if in.Brake > 0.5 {
 			brake := (in.Brake-0.5)*2 - in.Accel
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, brake*1e-3)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, brake)
 		} else {
-			factor := 0.55
+			rate := math.Abs(wheel.Joint.Axis1()[2])
+			factor := 0.45
 			if i < 2 {
-				factor = 0.45
+				factor = 0.55
 			}
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 160.0)
 			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*1e-3)
+			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*rate*rate)
 		}
 	}
 }
@@ -194,7 +214,7 @@ func (v *Vehicle) SetPosition(pos ode.Vector3) {
 		}
 		x := pos[0] + lr*v.tread/2
 		y := pos[1] + fr*v.wheelbase/2
-		z := pos[2] - 0.025
+		z := pos[2] - 0.0
 		w.body.SetPosition(ode.V3(x, y, z))
 	}
 	v.body.SetPosition(pos)

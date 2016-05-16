@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/rpc"
 	"net/rpc/jsonrpc"
+	"time"
 
 	"github.com/gopherjs/gopherjs/js"
 	"github.com/gopherjs/websocket"
@@ -64,21 +65,23 @@ func Start(c *rpc.Client) {
 	//cameraPan := 0.0
 	//cameraTilt := 0.0
 	cameraZoom := 20.0
-	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 1000)
+	camera := THREE.Get("PerspectiveCamera").New(cameraZoom, w/h, 0.1, 100)
 	camera.Get("up").Call("set", 0.0, 0.0, 1.0)
 	camera.Get("position").Call("set", 0.0, -1.0, +1.0)
 	scene.Call("add", camera)
 	scene.Call("add", THREE.Get("AmbientLight").New(0x444444))
-	sunlight := THREE.Get("DirectionalLight").New(0xffffff)
+	sunlight := THREE.Get("DirectionalLight").New(0xffffff, 1.3)
 	sunlight.Set("radius", 30.0)
-	sunlight.Get("position").Call("set", 5, 5, 10)
+	sunlight.Get("position").Call("set", 0.0, 0.0, 1.0)
 	sunlight.Set("castShadow", true)
+	sunlight.Get("shadow").Get("camera").Set("near", 0.1)
+	sunlight.Get("shadow").Get("camera").Set("far", 1.5)
 	sunlight.Get("shadow").Get("camera").Set("top", 25.0)
 	sunlight.Get("shadow").Get("camera").Set("bottom", -25.0)
 	sunlight.Get("shadow").Get("camera").Set("left", -25.0)
 	sunlight.Get("shadow").Get("camera").Set("right", 25.0)
-	sunlight.Get("shadow").Get("mapSize").Set("width", 1024)
-	sunlight.Get("shadow").Get("mapSize").Set("height", 1024)
+	sunlight.Get("shadow").Get("mapSize").Set("width", 512)
+	sunlight.Get("shadow").Get("mapSize").Set("height", 512)
 	scene.Call("add", sunlight)
 
 	window.Call("addEventListener", "resize", func() {
@@ -300,26 +303,29 @@ func Start(c *rpc.Client) {
 		}
 		if res.Self != nil {
 			pos := res.Self.Body.Position
-			camera.Call("lookAt", THREE.Get("Vector3").New(pos[0], pos[1], pos[2]))
+			p := THREE.Get("Vector3").New(pos[0], pos[1], pos[2])
+			camera.Call("lookAt", p)
+			camera.Set("fov", 30.0/(0.1*p.Call("length").Float()+1))
+			camera.Call("updateProjectionMatrix")
 		}
 		return nil
 	}
 
-	ch := make(chan struct{})
 	go func() {
 		defer fmt.Println("update goroutine exit")
+		tm := time.NewTicker(20 * time.Millisecond)
 		errorCnt := 0
 		for {
-			if _, ok := <-ch; !ok {
-				return
-			}
-			if err := update(); err != nil {
-				errorCnt++
-				if errorCnt >= 10 {
-					return
+			select {
+			case <-tm.C:
+				if err := update(); err != nil {
+					errorCnt++
+					if errorCnt >= 10 {
+						return
+					}
+				} else {
+					errorCnt = 0
 				}
-			} else {
-				errorCnt = 0
 			}
 		}
 	}()
@@ -327,10 +333,6 @@ func Start(c *rpc.Client) {
 	var render func()
 	render = func() {
 		stats.Call("begin")
-		select {
-		case ch <- struct{}{}:
-		default:
-		}
 		renderer.Call("render", scene, camera)
 		stats.Call("end")
 		js.Global.Call("requestAnimationFrame", render)

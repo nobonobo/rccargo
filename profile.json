@@ -5,31 +5,30 @@
 			0,
 			-9.80665
 		],
-		"CFM": 1e-8,
-		"ERP": 0.99,
+		"CFM": 1e-30,
+		"ERP": 0.8,
 		"QuickStepW": 0.1,
-		"QuickStepNumIterations": 30,
+		"QuickStepNumIterations": 20,
 		"CollideNum": 32,
-		"Mu": 0.75e+0,
-		"SoftCfm": 1e-8,
-		"SoftErp": 0.95
+		"Mu": 	0.95e+0,
+		"SoftCfm": 1e-10,
+		"SoftErp": 0.8
 	},
 	"Vehicle": {
-		"BodyDensity": 2.68,
+		"BodyDensity": 1.5,
 		"BodyBox": [
-			0.150,
+			0.115,
 			0.380,
-			0.050
+			0.035
 		],
 		"BodyZOffset": 0.0,
 		"Wheelbase": 0.267,
 		"Tread": 0.160,
-		"TireDensity": 2.68,
+		"TireDensity": 0.2,
 		"TireDiameter": 0.088,
-		"TireWidth": 0.033,
+		"TireWidth": 0.03, 
 		"FudgeFactorJtParam": 1.0,
-		"SuspensionStep": 1e-4,
-		"SuspensionSpring": 1.0e+4,
-		"SuspensionDamping": 0.5
+		"SuspensionCFM": 1e-10,
+		"SuspensionERP": 0.8
 	}
 }

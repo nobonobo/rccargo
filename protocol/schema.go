@@ -24,9 +24,8 @@ type VehicleProfile struct {
 	TireDiameter       float64   // default 0.088m
 	TireWidth          float64   // default 0.033m
 	FudgeFactorJtParam float64
-	SuspensionStep     float64
-	SuspensionSpring   float64
-	SuspensionDamping  float64
+	SuspensionCFM      float64
+	SuspensionERP      float64
 }
 
 // Profile ...
