@@ -313,19 +313,20 @@ func Start(c *rpc.Client) {
 
 	go func() {
 		defer fmt.Println("update goroutine exit")
-		tm := time.NewTicker(20 * time.Millisecond)
 		errorCnt := 0
 		for {
-			select {
-			case <-tm.C:
-				if err := update(); err != nil {
-					errorCnt++
-					if errorCnt >= 10 {
-						return
-					}
-				} else {
-					errorCnt = 0
+			begin := time.Now()
+			if err := update(); err != nil {
+				errorCnt++
+				if errorCnt >= 10 {
+					return
 				}
+			} else {
+				errorCnt = 0
+			}
+			d := 20*time.Millisecond - time.Since(begin)
+			if d > 0 {
+				time.Sleep(d)
 			}
 		}
 	}()
