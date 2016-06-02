@@ -324,7 +324,7 @@ func Start(c *rpc.Client) {
 			} else {
 				errorCnt = 0
 			}
-			d := 20*time.Millisecond - time.Since(begin)
+			d := 16*time.Millisecond - time.Since(begin)
 			if d > 0 {
 				time.Sleep(d)
 			}

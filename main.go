@@ -221,7 +221,7 @@ func main() {
 	f(root, 0)
 
 	go func() {
-		d := 10 * time.Millisecond
+		d := 5 * time.Millisecond
 		tick := time.NewTicker(d)
 		for {
 			<-tick.C

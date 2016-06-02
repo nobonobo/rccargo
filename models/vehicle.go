@@ -88,37 +88,21 @@ func NewVehicle(ctx *Context, profile protocol.VehicleProfile) *Vehicle {
 	}
 	v.tread = profile.Tread
 	v.wheelbase = profile.Wheelbase
-	camber := 15.0 // deg
+	camber := mgl.DegToRad(15.0)
 	for i, w := range v.wheels {
 		w.Joint.Attach(v.body, w.body)
 		w.Joint.SetAxis2(ode.V3(1, 0, 0))
 		w.Joint.SetParam(ode.FudgeFactorJtParam, profile.FudgeFactorJtParam)
 		w.Joint.SetParam(ode.FMaxJtParam, 1.0) // 操舵トルク最大値Nm
 		if i/2 == 0 {
-			ax1 := mgl.HomogRotate3DX(mgl.DegToRad(camber)).Mul4x1(mgl.Vec4{0, 0, -1})
+			ax1 := mgl.HomogRotate3DX(camber).Mul4x1(mgl.Vec4{0, 0, -1})
 			w.Joint.SetAxis1(ode.V3(ax1[0], ax1[1], ax1[2]))
 			w.Joint.SetParam(ode.LoStopJtParam, -1.0) // 操舵最小角
 			w.Joint.SetParam(ode.HiStopJtParam, 1.0)  // 操舵最大角
 		} else {
 			w.Joint.SetAxis1(ode.V3(0.0, 0.0, -1.0))
-			w.Joint.SetParam(ode.LoStopJtParam, 0.0)     // 操舵最小角
-			w.Joint.SetParam(ode.HiStopJtParam, 0.0)     // 操舵最大角
-			w.Joint.SetParam(ode.CFMJtParam, 1e-30)      //
-			w.Joint.SetParam(ode.CFMJtParam1, 1e-30)     //
-			w.Joint.SetParam(ode.CFMJtParam2, 1e-30)     //
-			w.Joint.SetParam(ode.CFMJtParam3, 1e-30)     //
-			w.Joint.SetParam(ode.StopCFMJtParam, 1e-30)  //
-			w.Joint.SetParam(ode.StopCFMJtParam1, 1e-30) //
-			w.Joint.SetParam(ode.StopCFMJtParam2, 1e-30) //
-			w.Joint.SetParam(ode.StopCFMJtParam3, 1e-30) //
-			w.Joint.SetParam(ode.ERPJtParam, 1.0)        //
-			w.Joint.SetParam(ode.ERPJtParam1, 1.0)       //
-			w.Joint.SetParam(ode.ERPJtParam2, 1.0)       //
-			w.Joint.SetParam(ode.ERPJtParam3, 1.0)       //
-			w.Joint.SetParam(ode.StopERPJtParam, 1.0)    //
-			w.Joint.SetParam(ode.StopERPJtParam1, 1.0)   //
-			w.Joint.SetParam(ode.StopERPJtParam2, 1.0)   //
-			w.Joint.SetParam(ode.StopERPJtParam3, 1.0)   //
+			w.Joint.SetParam(ode.LoStopJtParam, 0.0) // 操舵最小角
+			w.Joint.SetParam(ode.HiStopJtParam, 0.0) // 操舵最大角
 		}
 		w.Joint.SetParam(ode.BounceJtParam, 0.5)
 		w.Joint.SetParam(ode.SuspensionCFMJtParam, profile.SuspensionCFM)
@@ -166,39 +150,50 @@ func (v *Vehicle) Wheel(index int) *Wheel {
 
 func (v *Vehicle) Update(dt float64) {
 	for _, wheel := range v.wheels[:2] {
-		d := (v.steering / 3.0) - wheel.Joint.Angle1()
+		d := (v.steering / 2.5) - wheel.Joint.Angle1()
 		if d > 2*math.Pi {
 			d = 2 * math.Pi
 		}
 		if d < -2*math.Pi {
 			d = -2 * math.Pi
 		}
-		wheel.Joint.SetParam(ode.VelJtParam, d*dt*1e4)
+		wheel.Joint.SetParam(ode.VelJtParam, d*dt*2e4)
 	}
 }
 
 func (v *Vehicle) Set(in *protocol.Input) {
 	v.steering = -in.Steering
+	vel := make([]float64, len(v.wheels))
 	for i, wheel := range v.wheels {
-		// 動摩擦力?
-		//rate := math.Abs(wheel.body.AngularVel()[0] / 150.0)
-		if in.Brake > 0.5 {
-			brake := (in.Brake-0.5)*2 - in.Accel
+		vel[i] = wheel.Joint.Param(ode.VelJtParam2)
+	}
+	if in.Brake > 0.5 {
+		brake := (in.Brake-0.5)*2 - in.Accel
+		for _, wheel := range v.wheels {
 			// 動輪目標速度rad/s
 			wheel.Joint.SetParam(ode.VelJtParam2, 0.0)
 			// 動輪トルク最大値Nm
 			wheel.Joint.SetParam(ode.FMaxJtParam2, brake)
-		} else {
-			rate := math.Abs(wheel.Joint.Axis1()[2])
-			factor := 0.45
-			if i < 2 {
-				factor = 0.55
-			}
-			// 動輪目標速度rad/s
-			wheel.Joint.SetParam(ode.VelJtParam2, 160.0)
-			// 動輪トルク最大値Nm
-			wheel.Joint.SetParam(ode.FMaxJtParam2, factor*in.Accel*rate*rate)
 		}
+	} else {
+		revMax := 320.0
+		tVel := revMax * in.Accel
+		fVel := (vel[0] + vel[1]) / 2
+		dfVel := tVel - fVel
+		rVel := (vel[2] + vel[3]) / 2
+		drVel := tVel - rVel
+		fDiff := (vel[0] - vel[1]) / 2
+		rDiff := (vel[2] - vel[3]) / 2
+		// 動輪目標速度rad/s
+		v.wheels[0].Joint.SetParam(ode.VelJtParam2, vel[0]+(dfVel+fDiff)/revMax)
+		v.wheels[1].Joint.SetParam(ode.VelJtParam2, vel[1]+(dfVel-fDiff)/revMax)
+		v.wheels[2].Joint.SetParam(ode.VelJtParam2, vel[2]+(drVel+rDiff)/revMax)
+		v.wheels[3].Joint.SetParam(ode.VelJtParam2, vel[3]+(drVel-rDiff)/revMax)
+		// 動輪トルク最大値Nm
+		v.wheels[0].Joint.SetParam(ode.FMaxJtParam2, (dfVel+fDiff)/revMax)
+		v.wheels[1].Joint.SetParam(ode.FMaxJtParam2, (dfVel-fDiff)/revMax)
+		v.wheels[2].Joint.SetParam(ode.FMaxJtParam2, (drVel-rDiff)/revMax)
+		v.wheels[3].Joint.SetParam(ode.FMaxJtParam2, (drVel-rDiff)/revMax)
 	}
 }
 

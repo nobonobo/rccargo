@@ -5,13 +5,13 @@
 			0,
 			-9.80665
 		],
-		"CFM": 1e-30,
+		"CFM": 1e-8,
 		"ERP": 0.8,
-		"QuickStepW": 0.1,
+		"QuickStepW": 0.020,
 		"QuickStepNumIterations": 20,
 		"CollideNum": 32,
-		"Mu": 	0.95e+0,
-		"SoftCfm": 1e-10,
+		"Mu": 	0.85e+0,
+		"SoftCfm": 1e-8,
 		"SoftErp": 0.8
 	},
 	"Vehicle": {
@@ -27,8 +27,8 @@
 		"TireDensity": 0.2,
 		"TireDiameter": 0.088,
 		"TireWidth": 0.03, 
-		"FudgeFactorJtParam": 1.0,
-		"SuspensionCFM": 1e-10,
-		"SuspensionERP": 0.8
+		"FudgeFactorJtParam": 0.4,
+		"SuspensionCFM": 1e-8,
+		"SuspensionERP": 0.3
 	}
 }
