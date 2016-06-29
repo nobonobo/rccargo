@@ -56,6 +56,30 @@ func (w *Wheel) Rotation() ode.Matrix3 {
 	return w.body.Rotation()
 }
 
+type DefGear struct {
+	Joint ode.Hinge2Joint
+	Gear  ode.Body
+	Left  ode.Body
+	Right ode.Body
+}
+
+func NewDefGear(ctx *Context) *DefGear {
+	d := &DefGear{
+		Joint: ctx.World.NewHinge2Joint(ode.JointGroup(0)),
+		Gear:  ctx.World.NewBody(),
+		Left:  ctx.World.NewBody(),
+		Right: ctx.World.NewBody(),
+	}
+	return d
+}
+
+func (d *DefGear) Destroy() {
+	d.Joint.Destroy()
+	d.Gear.Destroy()
+	d.Left.Destroy()
+	d.Right.Destroy()
+}
+
 // Vehicle ...
 type Vehicle struct {
 	body      ode.Body
